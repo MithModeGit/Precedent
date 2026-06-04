@@ -125,33 +125,45 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ sessionId: body.sessionId, redlineCount: 0 })
   }
 
-  // display_order follows each clause's position in the original document.
-  const orderBySection = new Map<string, number>()
+  // Match each redline back to its original clause by normalized text. This is more
+  // robust than matching on section numbers (which can repeat, be empty, or be
+  // mis-transcribed): it yields a correct document-order display_order and lets us
+  // restore the pristine original_text and section_number from the input. Unmatched
+  // redlines are placed after all matched clauses rather than scrambling the order.
+  const normalize = (text: string): string => text.replace(/\s+/g, '').toLowerCase()
+  const clauseByText = new Map<string, { index: number; text: string; sectionNumber: string }>()
   body.clauses.forEach((clause, index) => {
-    if (!orderBySection.has(clause.sectionNumber)) {
-      orderBySection.set(clause.sectionNumber, index)
-    }
+    clauseByText.set(normalize(clause.text), {
+      index,
+      text: clause.text,
+      sectionNumber: clause.sectionNumber,
+    })
   })
 
-  const clauseRows = redlines.map((redline, index) => ({
-    session_id: body.sessionId,
-    clause_type: redline.clauseType,
-    section_number: redline.sectionNumber,
-    priority_tier: redline.priority,
-    original_text: redline.originalText,
-    proposed_text: redline.proposedText,
-    rationale: redline.rationale,
-    citation: redline.citation,
-    counterparty_prediction: redline.counterpartyPrediction,
-    no_action_needed: redline.noActionNeeded,
-    display_order: orderBySection.get(redline.sectionNumber) ?? index,
-  }))
+  const clauseRows = redlines.map((redline, index) => {
+    const matched = clauseByText.get(normalize(redline.originalText))
+    return {
+      session_id: body.sessionId,
+      clause_type: redline.clauseType,
+      section_number: matched?.sectionNumber ?? redline.sectionNumber,
+      priority_tier: redline.priority,
+      original_text: matched?.text ?? redline.originalText,
+      proposed_text: redline.proposedText,
+      rationale: redline.rationale,
+      citation: redline.citation,
+      counterparty_prediction: redline.counterpartyPrediction,
+      no_action_needed: redline.noActionNeeded,
+      display_order: matched?.index ?? body.clauses.length + index,
+    }
+  })
 
   const { data: inserted, error: clauseError } = await supabase
     .from('clause_reviews')
     .insert(clauseRows)
     .select('id')
   if (clauseError) {
+    // Roll back the session row to avoid an orphaned session with no redlines.
+    await supabase.from('sessions').delete().eq('id', body.sessionId)
     return NextResponse.json({ error: 'Could not save the generated redlines.' }, { status: 500 })
   }
 

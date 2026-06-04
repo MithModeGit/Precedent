@@ -78,7 +78,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   const sessionId = randomUUID()
-  await storeOriginal(sessionId, fileName, buffer)
+  // Storing the original and the Pass 1 call are independent: run them in parallel and
+  // await the upload before returning so the serverless function does not exit early.
+  const uploadPromise = storeOriginal(sessionId, fileName, buffer)
 
   try {
     const classification = await generateStructured({
@@ -87,6 +89,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       prompt: parsed.text,
       pass: 1,
     })
+
+    await uploadPromise
 
     return NextResponse.json({
       sessionId,

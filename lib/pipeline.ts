@@ -43,6 +43,8 @@ export async function generateStructured<T>(opts: GenerateStructuredOptions<T>):
       if (attempt === 2) {
         throw new PipelineError(opts.pass, error)
       }
+      // Brief backoff so transient rate limits (429) or overload (503) can clear.
+      await new Promise((resolve) => setTimeout(resolve, 1500))
     }
   }
 
