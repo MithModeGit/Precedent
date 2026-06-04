@@ -75,7 +75,7 @@ function buildTrackedChangesXml(
 /** Renders run text, converting newlines to <w:br/> so line breaks survive in Word. */
 function runContent(escaped: string, tag: 'w:t' | 'w:delText'): string {
   return escaped
-    .split('\n')
+    .split(/\r?\n/)
     .map((segment) => `<${tag} xml:space="preserve">${segment}</${tag}>`)
     .join('<w:br/>')
 }
