@@ -42,7 +42,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   // Check the object's size via metadata BEFORE downloading, so an oversized object is
   // never pulled into the function's memory.
-  const { data: files } = await supabase.storage.from('uploads').list(body.sessionId)
+  const { data: files, error: listError } = await supabase.storage
+    .from('uploads')
+    .list(body.sessionId)
+  if (listError) console.error(`Failed to list storage objects: ${listError.message}`)
   const fileInfo = files?.find((f) => f.name === objectName)
   if (!fileInfo) {
     return NextResponse.json(
