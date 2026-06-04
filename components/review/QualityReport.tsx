@@ -17,12 +17,12 @@ const CHECKS: { key: keyof EvaluateOutput['binaryChecks']; label: string }[] = [
 
 /** The clauses that scored lowest on a given dimension, for the "where to focus" list. */
 function lowestClausesForDimension(
-  clauseScores: EvaluateOutput['clauseScores'],
+  clauseScores: EvaluateOutput['clauseScores'] | undefined | null,
   key: DimensionKey,
 ): EvaluateOutput['clauseScores'] {
-  return [...clauseScores]
-    .filter((c) => c.dimensions[key] < 5)
-    .sort((a, b) => a.dimensions[key] - b.dimensions[key])
+  return [...(clauseScores ?? [])]
+    .filter((c) => c.dimensions?.[key] != null && c.dimensions[key] < 5)
+    .sort((a, b) => (a.dimensions?.[key] ?? 0) - (b.dimensions?.[key] ?? 0))
     .slice(0, 3)
 }
 

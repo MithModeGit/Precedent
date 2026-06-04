@@ -79,13 +79,20 @@ export function RedlineCard({ clause }: { clause: ClauseReview }): React.ReactEl
   const [debouncedDraft, setDebouncedDraft] = useState(committedText)
   const [showPrediction, setShowPrediction] = useState(false)
 
-  // Reset local state when the active clause changes or its committed text updates.
+  // Reset modify/prediction state when the active clause changes.
   useEffect(() => {
     setIsModifying(false)
-    setDraft(committedText)
-    setDebouncedDraft(committedText)
     setShowPrediction(false)
-  }, [clause.id, committedText])
+  }, [clause.id])
+
+  // Sync the draft to the committed text whenever not editing, so cancelling an edit
+  // (or arriving at the clause) restores the saved version rather than an abandoned draft.
+  useEffect(() => {
+    if (!isModifying) {
+      setDraft(committedText)
+      setDebouncedDraft(committedText)
+    }
+  }, [committedText, isModifying])
 
   // Debounce the live diff while editing (300ms).
   useEffect(() => {
