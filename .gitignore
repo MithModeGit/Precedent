@@ -38,3 +38,5 @@ yarn-error.log*
 
 # os
 Thumbs.db
+
+.vercel
