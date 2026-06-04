@@ -97,6 +97,7 @@ function ClauseRow({ clause }: { clause: DetailClause }): React.ReactElement {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
         className="flex w-full items-center gap-3 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-navy"
       >
         <span className="text-text-muted">{open ? '⌄' : '›'}</span>
