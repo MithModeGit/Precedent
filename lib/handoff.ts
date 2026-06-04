@@ -21,6 +21,7 @@ export function storeHandoff(handoff: PipelineHandoff): void {
 }
 
 export function readHandoff(): PipelineHandoff | null {
+  if (typeof window === 'undefined') return null
   const raw = sessionStorage.getItem(KEY)
   if (!raw) return null
   try {

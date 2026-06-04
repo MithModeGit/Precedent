@@ -52,9 +52,13 @@ export function HomeScreen(): React.ReactElement {
       if (ids.length > 0) {
         const evals = await supabase
           .from('eval_runs')
-          .select('*')
+          .select('session_id, overall_score')
           .in('session_id', ids)
-        for (const e of (evals.data ?? []) as EvalRunRow[]) {
+        // The browser client does not infer column-subset selects; cast to the needed shape.
+        for (const e of (evals.data ?? []) as Pick<
+          EvalRunRow,
+          'session_id' | 'overall_score'
+        >[]) {
           scoreBySession.set(e.session_id, Number(e.overall_score))
         }
       }

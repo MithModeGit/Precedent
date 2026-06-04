@@ -55,6 +55,10 @@ export function UploadScreen(): React.ReactElement {
       setError('This file type is not supported. Upload a DOCX or PDF file.')
       return
     }
+    if (f.size > 4 * 1024 * 1024) {
+      setError('This file is larger than 4MB. Upload a smaller DOCX or PDF.')
+      return
+    }
     setError(null)
     setFile(f)
   }
@@ -104,12 +108,20 @@ export function UploadScreen(): React.ReactElement {
         <section>
           <p className="mb-2 text-sm font-semibold text-text-primary">Document</p>
           <div
+            role="button"
+            tabIndex={0}
             onDragOver={(e) => e.preventDefault()}
             onDrop={(e) => {
               e.preventDefault()
               selectFile(e.dataTransfer.files[0])
             }}
             onClick={() => inputRef.current?.click()}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                inputRef.current?.click()
+              }
+            }}
             className="cursor-pointer rounded-md border border-dashed border-border bg-surface p-8 text-center"
           >
             <input
