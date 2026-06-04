@@ -37,17 +37,37 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     )
   }
   const extension = lower.endsWith('.pdf') ? 'pdf' : 'docx'
+  const objectName = `original.${extension}`
+  const supabase = getSupabaseServer()
 
-  // Download the original the client uploaded to Storage.
-  const { data: blob, error: downloadError } = await getSupabaseServer()
-    .storage.from('uploads')
-    .download(`${body.sessionId}/original.${extension}`)
+  // Check the object's size via metadata BEFORE downloading, so an oversized object is
+  // never pulled into the function's memory.
+  const { data: files } = await supabase.storage.from('uploads').list(body.sessionId)
+  const fileInfo = files?.find((f) => f.name === objectName)
+  if (!fileInfo) {
+    return NextResponse.json(
+      { error: 'The uploaded file could not be read. Please try uploading again.' },
+      { status: 422 },
+    )
+  }
+  const declaredSize = (fileInfo.metadata as { size?: number } | null)?.size
+  if (declaredSize !== undefined && declaredSize > MAX_UPLOAD_BYTES) {
+    return NextResponse.json(
+      { error: 'This file is larger than 10MB. Upload a smaller DOCX or PDF.' },
+      { status: 413 },
+    )
+  }
+
+  const { data: blob, error: downloadError } = await supabase.storage
+    .from('uploads')
+    .download(`${body.sessionId}/${objectName}`)
   if (downloadError || !blob) {
     return NextResponse.json(
       { error: 'The uploaded file could not be read. Please try uploading again.' },
       { status: 422 },
     )
   }
+  // Backstop in case metadata size was unavailable.
   if (blob.size > MAX_UPLOAD_BYTES) {
     return NextResponse.json(
       { error: 'This file is larger than 10MB. Upload a smaller DOCX or PDF.' },
