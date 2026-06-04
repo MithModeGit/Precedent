@@ -1,15 +1,11 @@
 'use client'
 
+import { useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import type { EvaluateOutput } from '@/schemas/evaluate'
 import { useSession } from '@/components/review/SessionContext'
-
-const DIMENSIONS: { key: keyof EvaluateOutput['dimensions']; label: string }[] = [
-  { key: 'legalAccuracy', label: 'Legal Accuracy' },
-  { key: 'marketCalibration', label: 'Market Calibration' },
-  { key: 'redlinePrecision', label: 'Redline Precision' },
-  { key: 'explanationQuality', label: 'Explanation Quality' },
-  { key: 'proportionality', label: 'Proportionality' },
-]
+import { clauseTypeLabel } from '@/lib/clause-labels'
+import { DIMENSION_GUIDE, scoreMeaning, type DimensionKey } from '@/lib/dimension-guide'
 
 const CHECKS: { key: keyof EvaluateOutput['binaryChecks']; label: string }[] = [
   { key: 'dtsaNotice', label: 'DTSA Notice' },
@@ -19,20 +15,119 @@ const CHECKS: { key: keyof EvaluateOutput['binaryChecks']; label: string }[] = [
   { key: 'internalConsistency', label: 'Internal Consistency' },
 ]
 
-function DimensionBar({ label, score }: { label: string; score: number }): React.ReactElement {
+/** The clauses that scored lowest on a given dimension, for the "where to focus" list. */
+function lowestClausesForDimension(
+  clauseScores: EvaluateOutput['clauseScores'] | undefined | null,
+  key: DimensionKey,
+): EvaluateOutput['clauseScores'] {
+  return [...(clauseScores ?? [])]
+    .filter((c) => c.dimensions?.[key] != null && c.dimensions[key] < 5)
+    .sort((a, b) => (a.dimensions?.[key] ?? 0) - (b.dimensions?.[key] ?? 0))
+    .slice(0, 3)
+}
+
+function DimensionRow({
+  dimensionKey,
+  score,
+  clauseScores,
+  expanded,
+  onToggle,
+}: {
+  dimensionKey: DimensionKey
+  score: number
+  clauseScores: EvaluateOutput['clauseScores']
+  expanded: boolean
+  onToggle: () => void
+}): React.ReactElement {
+  const guide = DIMENSION_GUIDE.find((d) => d.key === dimensionKey)
+  if (!guide) return <></>
+  const focus = score < 5 ? lowestClausesForDimension(clauseScores, dimensionKey) : []
+
   return (
-    <div className="flex items-center gap-3">
-      <span className="w-40 shrink-0 text-xs text-text-secondary">{label}</span>
-      <div className="h-2 flex-1 rounded-full bg-surface-raised">
-        <div className="h-2 rounded-full bg-navy" style={{ width: `${(score / 5) * 100}%` }} />
-      </div>
-      <span className="w-8 shrink-0 text-right font-mono text-xs text-text-primary">{score}</span>
+    <div className="border-b border-border-subtle pb-3 last:border-b-0">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={expanded}
+        className="flex w-full items-center gap-3 py-1 text-left"
+      >
+        <span className="text-text-muted">{expanded ? '⌄' : '›'}</span>
+        <span className="w-36 shrink-0 text-xs text-text-secondary">{guide.label}</span>
+        <span className="h-2 flex-1 rounded-full bg-surface-raised">
+          <span
+            className="block h-2 rounded-full bg-navy"
+            style={{ width: `${(score / 5) * 100}%` }}
+          />
+        </span>
+        <span className="w-10 shrink-0 text-right font-mono text-xs text-text-primary">
+          {score}/5
+        </span>
+      </button>
+
+      <AnimatePresence initial={false}>
+        {expanded && (
+          <motion.div
+            key={dimensionKey}
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="space-y-3 pl-6 pt-3 text-sm leading-6">
+              <div>
+                <p className="text-xs uppercase tracking-widest text-text-muted">What this measures</p>
+                <p className="mt-1 text-text-secondary">{guide.measures}</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-widest text-text-muted">
+                  Your score: {score}/5
+                </p>
+                <p className="mt-1 text-text-secondary">
+                  {scoreMeaning(score)}. A 5 means: {guide.topScore}
+                </p>
+              </div>
+              {score < 5 && (
+                <>
+                  {focus.length > 0 && (
+                    <div>
+                      <p className="text-xs uppercase tracking-widest text-text-muted">
+                        Where to focus
+                      </p>
+                      <ul className="mt-1 space-y-1.5">
+                        {focus.map((c, i) => (
+                          <li key={i} className="text-text-secondary">
+                            <span className="font-medium text-text-primary">
+                              {clauseTypeLabel(c.clauseType)}
+                            </span>
+                            <span className="ml-2 font-mono text-xs text-text-muted">
+                              {c.sectionNumber} · {c.dimensions[dimensionKey]}/5
+                            </span>
+                            <span className="block text-xs">{c.evaluatorNote}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  <div>
+                    <p className="text-xs uppercase tracking-widest text-text-muted">
+                      Recommended next step
+                    </p>
+                    <p className="mt-1 text-text-secondary">{guide.nextStep}</p>
+                  </div>
+                </>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
 
 export function QualityReport(): React.ReactElement {
   const { evalResults } = useSession()
+  const [expanded, setExpanded] = useState<Set<DimensionKey>>(new Set())
 
   if (!evalResults) {
     return (
@@ -41,6 +136,15 @@ export function QualityReport(): React.ReactElement {
         review.
       </div>
     )
+  }
+
+  function toggle(key: DimensionKey): void {
+    setExpanded((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
   }
 
   return (
@@ -54,12 +158,22 @@ export function QualityReport(): React.ReactElement {
       </div>
 
       <div>
-        <p className="mb-3 text-sm font-semibold uppercase tracking-widest text-text-secondary">
-          Dimensions
-        </p>
-        <div className="space-y-2">
-          {DIMENSIONS.map((d) => (
-            <DimensionBar key={d.key} label={d.label} score={evalResults.dimensions[d.key]} />
+        <div className="mb-2 flex items-baseline justify-between">
+          <p className="text-sm font-semibold uppercase tracking-widest text-text-secondary">
+            Dimensions
+          </p>
+          <p className="text-xs text-text-muted">Select a dimension for detail</p>
+        </div>
+        <div className="space-y-1">
+          {DIMENSION_GUIDE.map((d) => (
+            <DimensionRow
+              key={d.key}
+              dimensionKey={d.key}
+              score={evalResults.dimensions[d.key]}
+              clauseScores={evalResults.clauseScores}
+              expanded={expanded.has(d.key)}
+              onToggle={() => toggle(d.key)}
+            />
           ))}
         </div>
       </div>
