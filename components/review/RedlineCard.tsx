@@ -131,7 +131,14 @@ export function RedlineCard({ clause }: { clause: ClauseReview }): React.ReactEl
               <DiffView original={clause.originalText} proposed={debouncedDraft} />
             </div>
             <div className="mt-4 flex gap-3">
-              <Button onClick={() => setDecision(clause.id, 'modified', draft)}>Confirm Edit</Button>
+              <Button
+                onClick={() => {
+                  setDecision(clause.id, 'modified', draft)
+                  setIsModifying(false)
+                }}
+              >
+                Confirm Edit
+              </Button>
               <Button variant="tertiary" onClick={() => setIsModifying(false)}>
                 Cancel
               </Button>

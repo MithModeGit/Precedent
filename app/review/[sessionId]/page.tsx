@@ -52,6 +52,7 @@ export default async function ReviewPage({
     noActionNeeded: row.no_action_needed,
     decision: row.decision,
     acceptedText: row.accepted_text,
+    decidedAt: row.decided_at,
     displayOrder: row.display_order,
   }))
 

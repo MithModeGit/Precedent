@@ -73,6 +73,7 @@ export interface ClauseReview {
   noActionNeeded: boolean
   decision: Decision | null
   acceptedText: string | null
+  decidedAt: string | null
   displayOrder: number
 }
 

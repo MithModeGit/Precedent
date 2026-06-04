@@ -73,7 +73,7 @@ export function SessionProvider({
       initial[clause.id] = {
         decision: clause.decision,
         acceptedText: clause.acceptedText,
-        decidedAt: null,
+        decidedAt: clause.decidedAt ?? null,
       }
     }
     return initial

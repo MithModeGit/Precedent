@@ -68,7 +68,9 @@ function Header({ session }: { session: ReviewSession }): React.ReactElement {
       const a = document.createElement('a')
       a.href = url
       a.download = `${session.documentName.replace(/\.[^.]+$/, '')}-redlined.docx`
+      document.body.appendChild(a)
       a.click()
+      document.body.removeChild(a)
       URL.revokeObjectURL(url)
     } catch {
       window.alert('The document could not be generated. Wait a moment and try exporting again.')
