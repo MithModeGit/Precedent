@@ -88,3 +88,4 @@ create table if not exists eval_clause_scores (
 );
 
 create index if not exists idx_eval_clause_scores_eval_run_id on eval_clause_scores(eval_run_id);
+create index if not exists idx_eval_clause_scores_clause_review_id on eval_clause_scores(clause_review_id);

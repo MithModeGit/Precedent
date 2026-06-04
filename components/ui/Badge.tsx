@@ -1,9 +1,11 @@
 import type { Priority } from '@/types'
 
+// Dedicated *-border tokens are used instead of an opacity modifier: Tailwind v3
+// opacity modifiers produce invalid CSS against colors defined as hex var() values.
 const PRIORITY_CLASSES: Record<Priority, string> = {
-  must: 'bg-must-bg text-must border-must/20',
-  should: 'bg-should-bg text-should border-should/20',
-  nice: 'bg-nice-bg text-nice border-nice/20',
+  must: 'bg-must-bg text-must border-must-border',
+  should: 'bg-should-bg text-should border-should-border',
+  nice: 'bg-nice-bg text-nice border-nice-border',
 }
 
 const PRIORITY_LABEL: Record<Priority, string> = {

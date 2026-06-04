@@ -4,6 +4,10 @@
  * Validation is presence-only and performs no network calls, so `next build`
  * succeeds with the placeholder values the CI workflow injects. Real values are
  * required at runtime when a pipeline pass or Supabase query actually executes.
+ *
+ * NEXT_PUBLIC_ variables are referenced by literal name only: Next.js statically
+ * inlines them into the client bundle at build time, and dynamic `process.env[key]`
+ * lookups would evaluate to undefined in the browser.
  */
 
 /**
@@ -13,42 +17,10 @@
  */
 export const GEMINI_MODEL_ID = 'gemini-3-flash-preview'
 
-type ServerEnvKey = 'GOOGLE_GENERATIVE_AI_API_KEY'
-type PublicEnvKey = 'NEXT_PUBLIC_SUPABASE_URL' | 'NEXT_PUBLIC_SUPABASE_ANON_KEY'
-
-function readPublic(key: PublicEnvKey): string {
-  const value = process.env[key]
+function required(name: string, value: string | undefined): string {
   if (!value) {
     throw new Error(
-      `Missing required environment variable ${key}. Add it to .env.local (see .env.example).`,
-    )
-  }
-  return value
-}
-
-/**
- * Reads the first present of several env var names. Supports both the spec name
- * (NEXT_PUBLIC_SUPABASE_ANON_KEY, injected by CI) and Supabase's newer
- * NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY naming.
- */
-function readFirstPublic(keys: readonly string[]): string {
-  for (const key of keys) {
-    const value = process.env[key]
-    if (value) return value
-  }
-  throw new Error(
-    `Missing required environment variable. Set one of: ${keys.join(', ')} (see .env.example).`,
-  )
-}
-
-function readServer(key: ServerEnvKey): string {
-  if (typeof window !== 'undefined') {
-    throw new Error(`Server-only environment variable ${key} read in the browser.`)
-  }
-  const value = process.env[key]
-  if (!value) {
-    throw new Error(
-      `Missing required environment variable ${key}. Add it to .env.local (see .env.example).`,
+      `Missing required environment variable ${name}. Add it to .env.local (see .env.example).`,
     )
   }
   return value
@@ -56,18 +28,26 @@ function readServer(key: ServerEnvKey): string {
 
 export const publicEnv = {
   get supabaseUrl(): string {
-    return readPublic('NEXT_PUBLIC_SUPABASE_URL')
+    return required('NEXT_PUBLIC_SUPABASE_URL', process.env.NEXT_PUBLIC_SUPABASE_URL)
   },
   get supabaseAnonKey(): string {
-    return readFirstPublic([
-      'NEXT_PUBLIC_SUPABASE_ANON_KEY',
-      'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
-    ])
+    // Both names referenced as literals so Next.js inlines whichever is set.
+    // Supports the spec/CI name and Supabase's newer publishable-key name.
+    const value =
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
+      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+    return required(
+      'NEXT_PUBLIC_SUPABASE_ANON_KEY or NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
+      value,
+    )
   },
 }
 
 export const serverEnv = {
   get googleApiKey(): string {
-    return readServer('GOOGLE_GENERATIVE_AI_API_KEY')
+    if (typeof window !== 'undefined') {
+      throw new Error('Server-only environment variable GOOGLE_GENERATIVE_AI_API_KEY read in the browser.')
+    }
+    return required('GOOGLE_GENERATIVE_AI_API_KEY', process.env.GOOGLE_GENERATIVE_AI_API_KEY)
   },
 }
