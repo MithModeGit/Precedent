@@ -90,8 +90,11 @@ function insertDisclaimerParagraph(documentXml: string): string {
   if (bodyClose === -1) return documentXml
   const before = documentXml.slice(0, bodyClose)
   const sectIdx = before.lastIndexOf('<w:sectPr')
-  // Only treat it as the body-level sectPr if it closes immediately before </w:body>.
-  const isBodySectPr = sectIdx !== -1 && /<\/w:sectPr>\s*$/.test(before.slice(sectIdx))
+  // Only treat it as the body-level sectPr if the slice ends with this sectPr's own close:
+  // either </w:sectPr> or a self-closing <w:sectPr .../> (the [^>]* cannot cross the open
+  // tag's >, so a normal sectPr ending in some other self-closing child does not match).
+  const isBodySectPr =
+    sectIdx !== -1 && /(<\/w:sectPr>|<w:sectPr\b[^>]*\/>)\s*$/.test(before.slice(sectIdx))
   const insertAt = isBodySectPr ? sectIdx : bodyClose
   return documentXml.slice(0, insertAt) + p + documentXml.slice(insertAt)
 }

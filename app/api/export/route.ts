@@ -66,7 +66,7 @@ export async function POST(request: NextRequest): Promise<NextResponse | Respons
         acceptedText: r.accepted_text as string,
         rationale: r.rationale,
       }))
-      buffer = await generateFreshRedlinedDocx(session.document_name, redlines)
+      buffer = await generateFreshRedlinedDocx(session.document_name ?? 'Document', redlines)
     }
   } catch (error) {
     console.error(`Export generation failed: ${error instanceof Error ? error.message : 'unknown'}`)
@@ -82,7 +82,7 @@ export async function POST(request: NextRequest): Promise<NextResponse | Respons
   // user-supplied, so strip anything outside a safe set to prevent header injection
   // (CR/LF) or a broken quoted-string (embedded quotes).
   const safeBase =
-    session.document_name
+    (session.document_name ?? '')
       .replace(/\.[^.]+$/, '')
       .replace(/[^a-zA-Z0-9 ._-]/g, '')
       .trim()
