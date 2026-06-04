@@ -56,6 +56,40 @@ export type ClauseType =
   | 'other'
 
 // ---------------------------------------------------------------------------
+// Client-facing shapes
+// ---------------------------------------------------------------------------
+
+/** A clause review in camelCase, passed from the server page to client components. */
+export interface ClauseReview {
+  id: string
+  clauseType: ClauseType
+  sectionNumber: string
+  priority: Priority
+  originalText: string
+  proposedText: string
+  rationale: string
+  citation: string
+  counterpartyPrediction: string
+  noActionNeeded: boolean
+  decision: Decision | null
+  acceptedText: string | null
+  displayOrder: number
+}
+
+/** Session metadata passed to the review interface. */
+export interface ReviewSession {
+  id: string
+  documentName: string
+  documentType: DocumentType
+  useCase: UseCase
+  governingLaw: string
+  signatoryType: SignatoryType
+  partyPerspective: PartyPerspective
+  mode: ReviewMode
+  status: SessionStatus
+}
+
+// ---------------------------------------------------------------------------
 // Database row shapes
 // ---------------------------------------------------------------------------
 
