@@ -9,6 +9,10 @@ import { CLASSIFY_SYSTEM_PROMPT } from '@/prompts/classify'
 export const runtime = 'nodejs'
 export const maxDuration = 120
 
+/** Server-side upload ceiling: guards function memory/time and cost against a client
+ * pointing the session at an oversized object. Mirrors the client-side limit. */
+const MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+
 // The client uploads the original directly to Supabase Storage (browser -> Storage),
 // then calls this route with the storage location. This avoids the serverless request
 // body limit (~4.5MB on Vercel), so there is no upload size cap on the document itself.
@@ -42,6 +46,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json(
       { error: 'The uploaded file could not be read. Please try uploading again.' },
       { status: 422 },
+    )
+  }
+  if (blob.size > MAX_UPLOAD_BYTES) {
+    return NextResponse.json(
+      { error: 'This file is larger than 10MB. Upload a smaller DOCX or PDF.' },
+      { status: 413 },
     )
   }
   const buffer = Buffer.from(await blob.arrayBuffer())

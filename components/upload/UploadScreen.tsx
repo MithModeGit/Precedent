@@ -11,6 +11,9 @@ import { getSupabaseBrowser } from '@/lib/supabase'
 const DOCX_CONTENT_TYPE =
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
 
+/** Upload ceiling: well above any real NDA, bounds function memory/time and cost. */
+const MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+
 const PERSPECTIVES: { value: PartyPerspective; label: string; description: string }[] = [
   {
     value: 'disclosing',
@@ -57,6 +60,10 @@ export function UploadScreen(): React.ReactElement {
     const lower = f.name.toLowerCase()
     if (!lower.endsWith('.pdf') && !lower.endsWith('.docx')) {
       setError('This file type is not supported. Upload a DOCX or PDF file.')
+      return
+    }
+    if (f.size > MAX_UPLOAD_BYTES) {
+      setError('This file is larger than 10MB. Upload a smaller DOCX or PDF.')
       return
     }
     setError(null)
