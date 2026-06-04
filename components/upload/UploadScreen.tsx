@@ -6,6 +6,10 @@ import type { PartyPerspective, ReviewMode } from '@/types'
 import { Button } from '@/components/ui/Button'
 import { ProcessingScreen } from '@/components/processing/ProcessingScreen'
 import { storeHandoff } from '@/lib/handoff'
+import { getSupabaseBrowser } from '@/lib/supabase'
+
+const DOCX_CONTENT_TYPE =
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
 
 const PERSPECTIVES: { value: PartyPerspective; label: string; description: string }[] = [
   {
@@ -55,10 +59,6 @@ export function UploadScreen(): React.ReactElement {
       setError('This file type is not supported. Upload a DOCX or PDF file.')
       return
     }
-    if (f.size > 4 * 1024 * 1024) {
-      setError('This file is larger than 4MB. Upload a smaller DOCX or PDF.')
-      return
-    }
     setError(null)
     setFile(f)
   }
@@ -67,11 +67,27 @@ export function UploadScreen(): React.ReactElement {
     if (!file || !perspective) return
     setProcessing(true)
     setStage(0)
-    const advance = setTimeout(() => setStage(1), 1200)
     try {
-      const formData = new FormData()
-      formData.append('file', file)
-      const res = await fetch('/api/pipeline/classify', { method: 'POST', body: formData })
+      // Upload the original directly to Storage (browser -> Storage), bypassing the
+      // serverless request body limit so documents of any size are supported.
+      const sessionId = crypto.randomUUID()
+      const extension = file.name.toLowerCase().endsWith('.pdf') ? 'pdf' : 'docx'
+      const contentType = extension === 'pdf' ? 'application/pdf' : DOCX_CONTENT_TYPE
+      const { error: uploadError } = await getSupabaseBrowser()
+        .storage.from('uploads')
+        .upload(`${sessionId}/original.${extension}`, file, { contentType, upsert: true })
+      if (uploadError) {
+        setError('The file could not be uploaded. Check your connection and try again.')
+        setProcessing(false)
+        return
+      }
+
+      setStage(1)
+      const res = await fetch('/api/pipeline/classify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId, fileName: file.name }),
+      })
       const data = await res.json()
       if (!res.ok) {
         setError(data.error ?? 'Something interrupted the analysis. Refresh the page and try again.')
@@ -90,8 +106,6 @@ export function UploadScreen(): React.ReactElement {
     } catch {
       setError('Something interrupted the analysis. Refresh the page and try again.')
       setProcessing(false)
-    } finally {
-      clearTimeout(advance)
     }
   }
 
