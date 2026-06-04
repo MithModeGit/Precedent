@@ -37,6 +37,14 @@ export async function generateStructured<T>(opts: GenerateStructuredOptions<T>):
         schema: opts.schema,
         system: opts.system,
         prompt: opts.prompt,
+        // Pass 2 echoes full clause text per redline and Pass 3 scores every clause, so
+        // the output can be large; raise the cap well above the model default to avoid
+        // truncated JSON (finishReason "length").
+        maxTokens: 60000,
+        // Disable thinking: unbounded reasoning consumes the output token budget and
+        // truncates the structured JSON (these passes are extraction/scoring, not open
+        // reasoning). gemini-3-flash-preview does not reliably honor partial budgets.
+        providerOptions: { google: { thinkingConfig: { thinkingBudget: 0 } } },
       })
       return object
     } catch (error) {
