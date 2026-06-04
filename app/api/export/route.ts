@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { getSupabaseServer } from '@/lib/supabase'
 import { clauseTypeLabel } from '@/lib/clause-labels'
 import { generateRedlinedDocx, type DocxRedline } from '@/lib/docx-export'
@@ -10,14 +11,14 @@ export const maxDuration = 120
 const DOCX_CONTENT_TYPE =
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
 
+const ExportRequestSchema = z.object({ sessionId: z.string().uuid() })
+
 export async function POST(request: NextRequest): Promise<NextResponse | Response> {
   let sessionId: string
   try {
-    const body = (await request.json()) as { sessionId?: string }
-    if (!body.sessionId) throw new Error('missing')
-    sessionId = body.sessionId
+    sessionId = ExportRequestSchema.parse(await request.json()).sessionId
   } catch {
-    return NextResponse.json({ error: 'A sessionId is required.' }, { status: 400 })
+    return NextResponse.json({ error: 'A valid sessionId is required.' }, { status: 400 })
   }
 
   const supabase = getSupabaseServer()
@@ -65,7 +66,7 @@ export async function POST(request: NextRequest): Promise<NextResponse | Respons
         acceptedText: r.accepted_text as string,
         rationale: r.rationale,
       }))
-      buffer = await generateFreshRedlinedDocx(session.document_name, redlines)
+      buffer = await generateFreshRedlinedDocx(session.document_name ?? 'Document', redlines)
     }
   } catch (error) {
     console.error(`Export generation failed: ${error instanceof Error ? error.message : 'unknown'}`)
@@ -77,11 +78,19 @@ export async function POST(request: NextRequest): Promise<NextResponse | Respons
     .update({ status: 'exported', export_generated_at: new Date().toISOString() })
     .eq('id', sessionId)
 
-  const baseName = session.document_name.replace(/\.[^.]+$/, '')
+  // Sanitize the filename for the Content-Disposition header: document_name is
+  // user-supplied, so strip anything outside a safe set to prevent header injection
+  // (CR/LF) or a broken quoted-string (embedded quotes).
+  const safeBase =
+    (session.document_name ?? '')
+      .replace(/\.[^.]+$/, '')
+      .replace(/[^a-zA-Z0-9 ._-]/g, '')
+      .trim()
+      .slice(0, 100) || 'document'
   return new Response(new Uint8Array(buffer), {
     headers: {
       'Content-Type': DOCX_CONTENT_TYPE,
-      'Content-Disposition': `attachment; filename="${baseName}-redlined.docx"`,
+      'Content-Disposition': `attachment; filename="${safeBase}-redlined.docx"`,
     },
   })
 }

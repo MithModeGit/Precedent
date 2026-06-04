@@ -79,6 +79,23 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
   const buffer = Buffer.from(await blob.arrayBuffer())
 
+  // Verify the bytes actually match the claimed type before handing to a parser: a DOCX
+  // is a ZIP (magic "PK\x03\x04"), a PDF starts with "%PDF". This rejects a renamed or
+  // malformed file rather than feeding it to mammoth/pdf-parse.
+  const isPdfMagic = buffer.length >= 4 && buffer.toString('latin1', 0, 4) === '%PDF'
+  const isZipMagic =
+    buffer.length >= 4 &&
+    buffer[0] === 0x50 &&
+    buffer[1] === 0x4b &&
+    buffer[2] === 0x03 &&
+    buffer[3] === 0x04
+  if ((extension === 'pdf' && !isPdfMagic) || (extension === 'docx' && !isZipMagic)) {
+    return NextResponse.json(
+      { error: 'This file does not appear to be a valid DOCX or PDF. Upload the original document.' },
+      { status: 422 },
+    )
+  }
+
   let parsed
   try {
     parsed = await parseDocument(body.fileName, buffer)

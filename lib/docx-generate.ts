@@ -8,6 +8,7 @@ import {
   HeadingLevel,
 } from 'docx'
 import { diff_match_patch } from 'diff-match-patch'
+import { LEGAL_DISCLAIMER } from '@/lib/legal'
 
 /**
  * Fallback export for PDF uploads (and any case with no original .docx). Generates a
@@ -67,6 +68,16 @@ export async function generateFreshRedlinedDocx(
       }),
     )
   }
+
+  children.push(
+    new Paragraph({
+      spacing: { before: 480 },
+      border: { top: { style: 'single', size: 6, space: 8, color: 'CCCCCC' } },
+      children: [
+        new TextRun({ text: LEGAL_DISCLAIMER, italics: true, size: 16, color: '64748B' }),
+      ],
+    }),
+  )
 
   const doc = new Document({ sections: [{ children }] })
   return Buffer.from(await Packer.toBuffer(doc))

@@ -1,5 +1,6 @@
 import JSZip from 'jszip'
 import { diff_match_patch } from 'diff-match-patch'
+import { LEGAL_DISCLAIMER } from '@/lib/legal'
 
 /**
  * In-place .docx redlining for DOCX uploads. Applies accepted and modified redlines as
@@ -78,6 +79,24 @@ function runContent(escaped: string, tag: 'w:t' | 'w:delText'): string {
     .split(/\r?\n/)
     .map((segment) => `<${tag} xml:space="preserve">${segment}</${tag}>`)
     .join('<w:br/>')
+}
+
+/** Inserts the legal disclaimer as the final body paragraph, before the body sectPr. */
+function insertDisclaimerParagraph(documentXml: string): string {
+  const p =
+    '<w:p><w:pPr><w:pBdr><w:top w:val="single" w:sz="6" w:space="8" w:color="CCCCCC"/></w:pBdr><w:spacing w:before="480"/></w:pPr>' +
+    `<w:r><w:rPr><w:i/><w:color w:val="64748B"/><w:sz w:val="16"/></w:rPr><w:t xml:space="preserve">${escapeXml(LEGAL_DISCLAIMER)}</w:t></w:r></w:p>`
+  const bodyClose = documentXml.lastIndexOf('</w:body>')
+  if (bodyClose === -1) return documentXml
+  const before = documentXml.slice(0, bodyClose)
+  const sectIdx = before.lastIndexOf('<w:sectPr')
+  // Only treat it as the body-level sectPr if the slice ends with this sectPr's own close:
+  // either </w:sectPr> or a self-closing <w:sectPr .../> (the [^>]* cannot cross the open
+  // tag's >, so a normal sectPr ending in some other self-closing child does not match).
+  const isBodySectPr =
+    sectIdx !== -1 && /(<\/w:sectPr>|<w:sectPr\b[^>]*\/>)\s*$/.test(before.slice(sectIdx))
+  const insertAt = isBodySectPr ? sectIdx : bodyClose
+  return documentXml.slice(0, insertAt) + p + documentXml.slice(insertAt)
 }
 
 function buildCommentsXml(comments: { id: number; rationale: string }[], timestamp: string): string {
@@ -201,6 +220,7 @@ export async function generateRedlinedDocx(
     return replacement ?? match
   })
 
+  documentXml = insertDisclaimerParagraph(documentXml)
   zip.file('word/document.xml', documentXml)
 
   if (comments.length > 0 || existingCommentsFile) {
