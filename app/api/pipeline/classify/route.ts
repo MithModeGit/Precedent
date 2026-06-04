@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { randomUUID } from 'crypto'
+import { z } from 'zod'
 import { parseDocument } from '@/lib/document-parsing'
 import { generateStructured, PipelineError } from '@/lib/pipeline'
 import { getSupabaseServer } from '@/lib/supabase'
@@ -9,54 +9,79 @@ import { CLASSIFY_SYSTEM_PROMPT } from '@/prompts/classify'
 export const runtime = 'nodejs'
 export const maxDuration = 120
 
-const DOCX_CONTENT_TYPE =
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+/** Server-side upload ceiling: guards function memory/time and cost against a client
+ * pointing the session at an oversized object. Mirrors the client-side limit. */
+const MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 
-/** Stores the uploaded original so the export route can retrieve it later. Non-fatal. */
-async function storeOriginal(
-  sessionId: string,
-  fileName: string,
-  buffer: Buffer,
-): Promise<void> {
-  const extension = fileName.toLowerCase().endsWith('.pdf') ? 'pdf' : 'docx'
-  const contentType = extension === 'pdf' ? 'application/pdf' : DOCX_CONTENT_TYPE
-  try {
-    const { error } = await getSupabaseServer()
-      .storage.from('uploads')
-      .upload(`${sessionId}/original.${extension}`, buffer, { contentType, upsert: true })
-    if (error) console.warn(`Original upload failed: ${error.message}`)
-  } catch (error) {
-    console.warn(`Original upload threw: ${error instanceof Error ? error.message : 'unknown'}`)
-  }
-}
+// The client uploads the original directly to Supabase Storage (browser -> Storage),
+// then calls this route with the storage location. This avoids the serverless request
+// body limit (~4.5MB on Vercel), so there is no upload size cap on the document itself.
+const ClassifyRequestSchema = z.object({
+  sessionId: z.string().uuid(),
+  fileName: z.string().min(1),
+})
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  let formData: FormData
+  let body: z.infer<typeof ClassifyRequestSchema>
   try {
-    formData = await request.formData()
+    body = ClassifyRequestSchema.parse(await request.json())
   } catch {
-    return NextResponse.json({ error: 'Expected multipart form data with a file.' }, { status: 400 })
+    return NextResponse.json({ error: 'Invalid request body.' }, { status: 400 })
   }
 
-  const file = formData.get('file')
-  if (!(file instanceof File)) {
-    return NextResponse.json({ error: 'No file was provided.' }, { status: 400 })
-  }
-
-  const fileName = file.name
-  const lower = fileName.toLowerCase()
+  const lower = body.fileName.toLowerCase()
   if (!lower.endsWith('.docx') && !lower.endsWith('.pdf')) {
     return NextResponse.json(
       { error: 'This file type is not supported. Upload a DOCX or PDF file.' },
       { status: 400 },
     )
   }
+  const extension = lower.endsWith('.pdf') ? 'pdf' : 'docx'
+  const objectName = `original.${extension}`
+  const supabase = getSupabaseServer()
 
-  const buffer = Buffer.from(await file.arrayBuffer())
+  // Check the object's size via metadata BEFORE downloading, so an oversized object is
+  // never pulled into the function's memory.
+  const { data: files, error: listError } = await supabase.storage
+    .from('uploads')
+    .list(body.sessionId)
+  if (listError) console.error(`Failed to list storage objects: ${listError.message}`)
+  const fileInfo = files?.find((f) => f.name === objectName)
+  if (!fileInfo) {
+    return NextResponse.json(
+      { error: 'The uploaded file could not be read. Please try uploading again.' },
+      { status: 422 },
+    )
+  }
+  const declaredSize = (fileInfo.metadata as { size?: number } | null)?.size
+  if (declaredSize !== undefined && declaredSize > MAX_UPLOAD_BYTES) {
+    return NextResponse.json(
+      { error: 'This file is larger than 10MB. Upload a smaller DOCX or PDF.' },
+      { status: 413 },
+    )
+  }
+
+  const { data: blob, error: downloadError } = await supabase.storage
+    .from('uploads')
+    .download(`${body.sessionId}/${objectName}`)
+  if (downloadError || !blob) {
+    return NextResponse.json(
+      { error: 'The uploaded file could not be read. Please try uploading again.' },
+      { status: 422 },
+    )
+  }
+  // Backstop in case metadata size was unavailable.
+  if (blob.size > MAX_UPLOAD_BYTES) {
+    return NextResponse.json(
+      { error: 'This file is larger than 10MB. Upload a smaller DOCX or PDF.' },
+      { status: 413 },
+    )
+  }
+  const buffer = Buffer.from(await blob.arrayBuffer())
 
   let parsed
   try {
-    parsed = await parseDocument(fileName, buffer)
+    parsed = await parseDocument(body.fileName, buffer)
   } catch {
     return NextResponse.json(
       {
@@ -77,11 +102,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     )
   }
 
-  const sessionId = randomUUID()
-  // Storing the original and the Pass 1 call are independent: run them in parallel and
-  // await the upload before returning so the serverless function does not exit early.
-  const uploadPromise = storeOriginal(sessionId, fileName, buffer)
-
   try {
     const classification = await generateStructured({
       schema: ClassifyOutputSchema,
@@ -90,11 +110,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       pass: 1,
     })
 
-    await uploadPromise
-
     return NextResponse.json({
-      sessionId,
-      fileName,
+      sessionId: body.sessionId,
+      fileName: body.fileName,
       pageCount: parsed.pageCount,
       likelyScanned: parsed.likelyScanned,
       classification,
