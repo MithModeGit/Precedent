@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import Link from 'next/link'
 import { AnimatePresence, motion } from 'framer-motion'
 import type { ClauseReview, ReviewSession } from '@/types'
 import { Button } from '@/components/ui/Button'
@@ -82,6 +83,14 @@ function Header({ session }: { session: ReviewSession }): React.ReactElement {
 
   return (
     <header className="flex items-center gap-4 border-b border-border bg-surface px-6 py-3">
+      <Link
+        href="/"
+        className="font-display text-lg text-text-primary transition-colors hover:text-navy"
+        aria-label="Go to home"
+      >
+        Precedent
+      </Link>
+      <span className="hidden h-5 w-px bg-border sm:block" aria-hidden="true" />
       <span className="text-sm font-medium text-text-primary">
         Reviewed {resolvedCount} of {clauses.length} redlines
       </span>

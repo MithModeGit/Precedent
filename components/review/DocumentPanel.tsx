@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { motion } from 'framer-motion'
 import type { Priority } from '@/types'
 import { clauseTypeLabel } from '@/lib/clause-labels'
 import { useSession, isResolved } from '@/components/review/SessionContext'
@@ -19,27 +19,27 @@ const BORDER_RESOLVED: Record<Priority, string> = {
 }
 
 export function DocumentPanel(): React.ReactElement {
-  const { clauses, decisions, currentClauseId, setCurrentClauseId } = useSession()
-
-  const documentOrder = useMemo(
-    () => [...clauses].sort((a, b) => a.displayOrder - b.displayOrder),
-    [clauses],
-  )
+  const { orderedClauses, decisions, currentClauseId, setCurrentClauseId, sortOrder } = useSession()
 
   return (
     <div className="h-full overflow-y-auto bg-surface p-6">
       <p className="mb-4 font-sans text-sm font-semibold uppercase tracking-widest text-text-secondary">
-        Document
+        Clauses
+        <span className="ml-2 font-sans text-xs font-normal normal-case tracking-normal text-text-muted">
+          ({sortOrder === 'priority' ? 'priority order' : 'document order'})
+        </span>
       </p>
-      <div className="space-y-4">
-        {documentOrder.map((clause) => {
+      <motion.div layout className="space-y-4">
+        {orderedClauses.map((clause) => {
           const resolved = isResolved(decisions[clause.id]?.decision ?? null)
           const isActive = clause.id === currentClauseId
           const border = resolved ? BORDER_RESOLVED[clause.priority] : BORDER_ACTIVE[clause.priority]
           return (
-            <button
+            <motion.button
+              layout
               key={clause.id}
               type="button"
+              transition={{ duration: 0.25, ease: 'easeOut' }}
               onClick={() => setCurrentClauseId(clause.id)}
               className={`block w-full border-l-2 pl-3 text-left transition-colors ${border} ${
                 isActive ? 'bg-surface-raised' : 'hover:bg-surface-raised'
@@ -52,10 +52,10 @@ export function DocumentPanel(): React.ReactElement {
               <p className="mt-1 whitespace-pre-wrap font-mono text-xs leading-5 text-text-primary">
                 {clause.originalText}
               </p>
-            </button>
+            </motion.button>
           )
         })}
-      </div>
+      </motion.div>
     </div>
   )
 }
