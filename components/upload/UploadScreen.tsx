@@ -14,6 +14,17 @@ const DOCX_CONTENT_TYPE =
 /** Upload ceiling: well above any real NDA, bounds function memory/time and cost. */
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 
+/** crypto.randomUUID is only defined in secure contexts; fall back for HTTP testing. */
+function newSessionId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0
+    return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16)
+  })
+}
+
 const PERSPECTIVES: { value: PartyPerspective; label: string; description: string }[] = [
   {
     value: 'disclosing',
@@ -77,7 +88,7 @@ export function UploadScreen(): React.ReactElement {
     try {
       // Upload the original directly to Storage (browser -> Storage), bypassing the
       // serverless request body limit so documents of any size are supported.
-      const sessionId = crypto.randomUUID()
+      const sessionId = newSessionId()
       const extension = file.name.toLowerCase().endsWith('.pdf') ? 'pdf' : 'docx'
       const contentType = extension === 'pdf' ? 'application/pdf' : DOCX_CONTENT_TYPE
       const { error: uploadError } = await getSupabaseBrowser()
