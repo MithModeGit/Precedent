@@ -40,8 +40,12 @@ async function persist(sessionId: string, scored: EvaluateOutput): Promise<void>
     .from('clause_reviews')
     .select('id, clause_type, section_number')
     .eq('session_id', sessionId)
+  // Normalize the match key so trivial whitespace/case differences in the section number
+  // (model-echoed vs stored) do not silently drop a clause's per-clause scores.
+  const keyOf = (clauseType: string, sectionNumber: string): string =>
+    `${clauseType}|${sectionNumber.trim().toLowerCase().replace(/\s+/g, ' ')}`
   const idByKey = new Map<string, string>()
-  for (const r of reviews ?? []) idByKey.set(`${r.clause_type}|${r.section_number}`, r.id)
+  for (const r of reviews ?? []) idByKey.set(keyOf(r.clause_type, r.section_number), r.id)
 
   const b = scored.binaryChecks
   // One eval run per session. Insert the new run first, then prune older runs (cascade
@@ -86,7 +90,7 @@ async function persist(sessionId: string, scored: EvaluateOutput): Promise<void>
 
   const clauseRows = scored.clauseScores
     .map((cs) => {
-      const clauseReviewId = idByKey.get(`${cs.clauseType}|${cs.sectionNumber}`)
+      const clauseReviewId = idByKey.get(keyOf(cs.clauseType, cs.sectionNumber))
       if (!clauseReviewId) return null
       return {
         eval_run_id: evalRunId,
