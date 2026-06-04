@@ -59,7 +59,7 @@ export type ClauseType =
 // Database row shapes
 // ---------------------------------------------------------------------------
 
-export interface SessionRow {
+export type SessionRow = {
   id: string
   device_id: string
   created_at: string
@@ -75,7 +75,7 @@ export interface SessionRow {
   is_benchmark: boolean
 }
 
-export interface ClauseReviewRow {
+export type ClauseReviewRow = {
   id: string
   session_id: string
   clause_type: ClauseType
@@ -93,7 +93,7 @@ export interface ClauseReviewRow {
   display_order: number
 }
 
-export interface EvalRunRow {
+export type EvalRunRow = {
   id: string
   session_id: string
   created_at: string
@@ -116,7 +116,7 @@ export interface EvalRunRow {
   improvement_notes: string[]
 }
 
-export interface EvalClauseScoreRow {
+export type EvalClauseScoreRow = {
   id: string
   eval_run_id: string
   clause_review_id: string
