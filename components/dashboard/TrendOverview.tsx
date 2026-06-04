@@ -74,10 +74,12 @@ function delta(current: number | null, prior: number | null): 'up' | 'down' | 'f
 export function TrendOverview({
   sessions,
   clausePerformance,
+  scoreDistribution,
   now,
 }: {
   sessions: SessionWithEval[]
   clausePerformance: ClausePerformance[]
+  scoreDistribution: Record<number, number>
   now: number
 }): React.ReactElement {
   const [rangeIdx, setRangeIdx] = useState(1)
@@ -122,6 +124,22 @@ export function TrendOverview({
     () => [...clausePerformance].sort((a, b) => a.averageScore - b.averageScore),
     [clausePerformance],
   )
+
+  // Weakest dimension this period: the lowest current average, to point the team at it.
+  const weakestDimension = useMemo(() => {
+    if (!cur.dimensions) return null
+    return DIMENSIONS.reduce(
+      (low, d) =>
+        (cur.dimensions![d.key] ?? 5) < (cur.dimensions![low.key] ?? 5) ? d : low,
+      DIMENSIONS[0],
+    )
+  }, [cur.dimensions])
+
+  const distTotal = useMemo(
+    () => Object.values(scoreDistribution).reduce((a, b) => a + b, 0),
+    [scoreDistribution],
+  )
+  const fivePct = distTotal ? Math.round(((scoreDistribution[5] ?? 0) / distTotal) * 100) : null
 
   return (
     <div className="space-y-8">
@@ -187,6 +205,13 @@ export function TrendOverview({
           ) : (
             <p className="text-sm text-text-secondary">No evaluation data in this period.</p>
           )}
+          {weakestDimension && (
+            <p className="mt-4 border-t border-border-subtle pt-3 text-xs text-text-secondary">
+              <span className="font-medium text-text-primary">Weakest dimension: </span>
+              {weakestDimension.label} ({(cur.dimensions?.[weakestDimension.key] ?? 0).toFixed(1)}/5).
+              This is where the redline engine has the most room to improve in this period.
+            </p>
+          )}
         </div>
 
         <div className="rounded-md border border-border bg-surface p-6 shadow-sm">
@@ -218,6 +243,51 @@ export function TrendOverview({
             })}
           </div>
         </div>
+      </div>
+
+      <div className="rounded-md border border-border bg-surface p-6 shadow-sm">
+        <p className="mb-1 text-sm font-semibold uppercase tracking-widest text-text-secondary">
+          Evaluator score distribution
+        </p>
+        <p className="mb-4 text-xs text-text-muted">
+          Every per-clause dimension score (all sessions), by value. A healthy evaluator
+          discriminates; if scores pile up at 5, verify the engine is genuinely that strong rather
+          than the evaluator under-discriminating.
+        </p>
+        {distTotal > 0 ? (
+          <div className="space-y-2">
+            {[5, 4, 3, 2, 1].map((score) => {
+              const n = scoreDistribution[score] ?? 0
+              const pct = Math.round((n / distTotal) * 100)
+              return (
+                <div key={score} className="flex items-center gap-3">
+                  <span className="w-4 shrink-0 text-right font-mono text-xs text-text-secondary">
+                    {score}
+                  </span>
+                  <span className="h-3 flex-1 rounded-full bg-surface-raised">
+                    <span
+                      className="block h-3 rounded-full bg-navy"
+                      style={{ width: `${pct}%` }}
+                    />
+                  </span>
+                  <span className="w-16 shrink-0 text-right font-mono text-xs text-text-secondary">
+                    {n} ({pct}%)
+                  </span>
+                </div>
+              )
+            })}
+            {fivePct != null && fivePct >= 80 && (
+              <p className="mt-3 rounded-md bg-should-bg p-2 text-xs text-should">
+                {fivePct}% of dimension scores are 5. Confirm with the rationales that this reflects
+                genuine quality, or tighten the evaluator rubric/prompt so it discriminates more.
+              </p>
+            )}
+          </div>
+        ) : (
+          <p className="text-sm text-text-secondary">
+            Run document reviews to populate the score distribution.
+          </p>
+        )}
       </div>
 
       <div className="rounded-md border border-border bg-surface p-6 shadow-sm">

@@ -47,6 +47,8 @@ export interface ClausePerformance {
 export interface DashboardData {
   sessions: SessionWithEval[]
   clausePerformance: ClausePerformance[]
+  /** Count of every per-clause dimension score by value 1-5 (evaluator discrimination signal). */
+  scoreDistribution: Record<number, number>
 }
 
 export async function getDashboardData(): Promise<DashboardData> {
@@ -61,7 +63,11 @@ export async function getDashboardData(): Promise<DashboardData> {
     supabase.from('sessions').select('*').order('created_at', { ascending: true }),
     supabase.from('eval_runs').select('*'),
     supabase.from('clause_reviews').select('id, session_id, clause_type, decision'),
-    supabase.from('eval_clause_scores').select('clause_review_id, clause_overall_score'),
+    supabase
+      .from('eval_clause_scores')
+      .select(
+        'clause_review_id, clause_overall_score, legal_accuracy, market_calibration, redline_precision, explanation_quality, proportionality',
+      ),
   ])
 
   if (sessionsError || evalRunsError || reviewsError || clauseScoresError) {
@@ -140,5 +146,22 @@ export async function getDashboardData(): Promise<DashboardData> {
     }),
   )
 
-  return { sessions: sessionsWithEval, clausePerformance }
+  // Distribution of every per-clause dimension score (1-5): if the evaluator is
+  // discriminating, this spreads out; if it rubber-stamps, it piles up at 5.
+  const scoreDistribution: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
+  const DIM_COLS = [
+    'legal_accuracy',
+    'market_calibration',
+    'redline_precision',
+    'explanation_quality',
+    'proportionality',
+  ] as const
+  for (const cs of clauseScores ?? []) {
+    for (const col of DIM_COLS) {
+      const v = cs[col]
+      if (v >= 1 && v <= 5) scoreDistribution[v] = (scoreDistribution[v] ?? 0) + 1
+    }
+  }
+
+  return { sessions: sessionsWithEval, clausePerformance, scoreDistribution }
 }
