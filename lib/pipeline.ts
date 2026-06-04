@@ -1,7 +1,7 @@
-import { google } from '@ai-sdk/google'
+import { createGoogleGenerativeAI } from '@ai-sdk/google'
 import { generateObject } from 'ai'
 import type { z } from 'zod'
-import { GEMINI_MODEL_ID } from '@/lib/env'
+import { GEMINI_MODEL_ID, serverEnv } from '@/lib/env'
 
 export type PipelinePass = 1 | 2 | 3 | 4
 
@@ -28,6 +28,10 @@ interface GenerateStructuredOptions<T> {
  * (transient error or schema-validation miss), then throws a PipelineError.
  */
 export async function generateStructured<T>(opts: GenerateStructuredOptions<T>): Promise<T> {
+  // Build the provider with the sanitized key rather than the default google() provider,
+  // which reads process.env.GOOGLE_GENERATIVE_AI_API_KEY directly and would inherit any
+  // BOM/whitespace, breaking the request's auth header.
+  const google = createGoogleGenerativeAI({ apiKey: serverEnv.googleApiKey })
   const model = google(GEMINI_MODEL_ID)
 
   for (let attempt = 1; attempt <= 2; attempt++) {

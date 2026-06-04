@@ -17,13 +17,27 @@
  */
 export const GEMINI_MODEL_ID = 'gemini-3-flash-preview'
 
+/** Byte Order Mark code point (U+FEFF). */
+const BOM = 0xfeff
+
+function sanitize(value: string): string {
+  // Drop a leading BOM and surrounding whitespace. Some env sources prepend a BOM
+  // (for example, values piped through PowerShell into the Vercel CLI). A BOM is
+  // illegal in the HTTP headers the Supabase and Gemini clients build from these
+  // values and raises "Cannot convert argument to a ByteString because the
+  // character at index 0 has a value of 65279", failing every request.
+  const withoutBom = value.charCodeAt(0) === BOM ? value.slice(1) : value
+  return withoutBom.trim()
+}
+
 function required(name: string, value: string | undefined): string {
-  if (!value) {
+  const cleaned = value === undefined ? '' : sanitize(value)
+  if (!cleaned) {
     throw new Error(
       `Missing required environment variable ${name}. Add it to .env.local (see .env.example).`,
     )
   }
-  return value
+  return cleaned
 }
 
 export const publicEnv = {
