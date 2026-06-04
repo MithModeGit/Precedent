@@ -144,18 +144,18 @@ export function TrendOverview({
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard
-          value={cur.avgScore != null ? `${cur.avgScore.toFixed(1)} / 5.0` : '—'}
+          value={cur.avgScore != null ? `${cur.avgScore.toFixed(1)} / 5.0` : 'N/A'}
           label="Average Quality Score"
           trend={delta(cur.avgScore, pri.avgScore)}
         />
         <StatCard value={String(cur.count)} label="Sessions Completed" />
         <StatCard
-          value={cur.acceptanceRate != null ? `${Math.round(cur.acceptanceRate * 100)}%` : '—'}
+          value={cur.acceptanceRate != null ? `${Math.round(cur.acceptanceRate * 100)}%` : 'N/A'}
           label="Redline Acceptance Rate"
           trend={delta(cur.acceptanceRate, pri.acceptanceRate)}
         />
         <StatCard
-          value={cur.passRate != null ? `${Math.round(cur.passRate * 100)}%` : '—'}
+          value={cur.passRate != null ? `${Math.round(cur.passRate * 100)}%` : 'N/A'}
           label="Binary Check Pass Rate"
           trend={delta(cur.passRate, pri.passRate)}
         />
@@ -211,7 +211,7 @@ export function TrendOverview({
                 <div key={c.key} className="rounded-md border border-border-subtle p-3">
                   <p className="text-xs text-text-secondary">{c.label}</p>
                   <p className={`mt-1 font-display text-2xl ${color}`}>
-                    {pct != null ? `${pct}%` : '—'}
+                    {pct != null ? `${pct}%` : 'N/A'}
                   </p>
                 </div>
               )

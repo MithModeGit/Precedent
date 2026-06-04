@@ -59,7 +59,7 @@ export function SessionIndex({ sessions }: { sessions: SessionWithEval[] }): Rea
                   <td className="px-4 py-3 text-text-primary">
                     {s.documentName}
                     {s.isBenchmark && (
-                      <span className="ml-2 rounded-full bg-gold/15 px-2 py-0.5 text-[10px] text-gold">
+                      <span className="ml-2 rounded-full bg-[color-mix(in_srgb,var(--color-accent-gold)_15%,transparent)] px-2 py-0.5 text-[10px] text-gold">
                         Benchmark
                       </span>
                     )}
@@ -93,7 +93,7 @@ export function SessionIndex({ sessions }: { sessions: SessionWithEval[] }): Rea
                         ]}
                       />
                     ) : (
-                      <span className="text-xs text-text-muted">—</span>
+                      <span className="text-xs text-text-muted">N/A</span>
                     )}
                   </td>
                   <td className="px-4 py-3 text-right">

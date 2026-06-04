@@ -5,14 +5,35 @@ import { AnimatePresence, motion } from 'framer-motion'
 import type { EvaluateOutput } from '@/schemas/evaluate'
 import { useSession } from '@/components/review/SessionContext'
 import { clauseTypeLabel } from '@/lib/clause-labels'
+import { Tooltip } from '@/components/ui/Tooltip'
 import { DIMENSION_GUIDE, scoreMeaning, type DimensionKey } from '@/lib/dimension-guide'
 
-const CHECKS: { key: keyof EvaluateOutput['binaryChecks']; label: string }[] = [
-  { key: 'dtsaNotice', label: 'DTSA Notice' },
-  { key: 'california1660', label: 'California §16600' },
-  { key: 'tradeSecretBifurcation', label: 'Trade Secret Bifurcation' },
-  { key: 'aiTrainingCarveout', label: 'AI Training Carve-out' },
-  { key: 'internalConsistency', label: 'Internal Consistency' },
+const CHECKS: { key: keyof EvaluateOutput['binaryChecks']; label: string; info: string }[] = [
+  {
+    key: 'dtsaNotice',
+    label: 'DTSA Notice',
+    info: 'Defend Trade Secrets Act, 18 U.S.C. § 1833(b): without the whistleblower-immunity notice, the disclosing party cannot recover exemplary damages or attorney fees from an employee or contractor in a trade-secret action.',
+  },
+  {
+    key: 'california1660',
+    label: 'California §16600',
+    info: 'Cal. Bus. & Prof. Code § 16600: post-engagement non-solicitation and non-compete restraints are generally void in California, so such clauses are flagged when the governing law is California.',
+  },
+  {
+    key: 'tradeSecretBifurcation',
+    label: 'Trade Secret Bifurcation',
+    info: 'Confidentiality of trade secrets should survive for as long as the information remains a trade secret, separate from the fixed term that applies to other confidential information.',
+  },
+  {
+    key: 'aiTrainingCarveout',
+    label: 'AI Training Carve-out',
+    info: 'The agreement should bar using the disclosing party’s confidential information to train AI or machine-learning models absent explicit permission.',
+  },
+  {
+    key: 'internalConsistency',
+    label: 'Internal Consistency',
+    info: 'Defined terms, cross-references, and obligations should be internally consistent across the document.',
+  },
 ]
 
 /** The clauses that scored lowest on a given dimension, for the "where to focus" list. */
@@ -189,7 +210,10 @@ export function QualityReport(): React.ReactElement {
             return (
               <li key={c.key} className="border-b border-border-subtle pb-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-text-primary">{c.label}</span>
+                  <span className="inline-flex items-center text-sm text-text-primary">
+                    {c.label}
+                    <Tooltip text={c.info} />
+                  </span>
                   <span
                     className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                       pass ? 'bg-nice-bg text-nice' : 'bg-must-bg text-must'

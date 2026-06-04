@@ -121,7 +121,7 @@ export function HomeScreen(): React.ReactElement {
             archive the previous one, or return to finish it?
           </p>
           <div className="mt-3 flex gap-3">
-            <Button onClick={() => router.push('/upload')}>Start new review</Button>
+            <Button onClick={() => router.push('/upload')}>Start New Review</Button>
             <Button variant="secondary" onClick={() => router.push(`/review/${unfinished.id}`)}>
               Return to finish
             </Button>
@@ -130,22 +130,38 @@ export function HomeScreen(): React.ReactElement {
       )}
 
       <section className="mt-12 grid grid-cols-2 gap-4">
-        <div className="rounded-md border border-border bg-surface p-6 shadow-sm">
-          <p className="font-display text-3xl text-text-primary">{totalReviews}</p>
-          <p className="mt-1 text-xs text-text-secondary">Total Reviews</p>
-        </div>
-        <div className="rounded-md border border-border bg-surface p-6 shadow-sm">
-          <p className="font-display text-3xl text-text-primary">
-            {avgScore != null ? `${avgScore.toFixed(1)} / 5.0` : '—'}
-          </p>
-          <p className="mt-1 text-xs text-text-secondary">Average Quality Score</p>
-        </div>
+        {loading ? (
+          <>
+            <div className="h-[92px] animate-pulse rounded-md border border-border bg-surface" />
+            <div className="h-[92px] animate-pulse rounded-md border border-border bg-surface" />
+          </>
+        ) : (
+          <>
+            <div className="rounded-md border border-border bg-surface p-6 shadow-sm">
+              <p className="font-display text-3xl text-text-primary">{totalReviews}</p>
+              <p className="mt-1 text-xs text-text-secondary">Total Reviews</p>
+            </div>
+            <div className="rounded-md border border-border bg-surface p-6 shadow-sm">
+              <p className="font-display text-3xl text-text-primary">
+                {avgScore != null ? `${avgScore.toFixed(1)} / 5.0` : 'N/A'}
+              </p>
+              <p className="mt-1 text-xs text-text-secondary">Average Quality Score</p>
+            </div>
+          </>
+        )}
       </section>
 
       <section className="mt-12">
         <h2 className="font-display text-xl font-semibold text-text-primary">Recent Sessions</h2>
         {loading ? (
-          <p className="mt-4 text-sm text-text-secondary">Loading...</p>
+          <div className="mt-4 space-y-3" aria-hidden="true">
+            {[0, 1, 2].map((i) => (
+              <div
+                key={i}
+                className="h-[68px] animate-pulse rounded-md border border-border bg-surface"
+              />
+            ))}
+          </div>
         ) : sessions.length === 0 ? (
           <p className="mt-4 text-sm text-text-secondary">
             No reviews yet. Start your first review above.
@@ -161,7 +177,7 @@ export function HomeScreen(): React.ReactElement {
                   <p className="text-sm font-medium text-text-primary">
                     {s.document_name}
                     {s.is_benchmark && (
-                      <span className="ml-2 rounded-full bg-gold/15 px-2 py-0.5 text-[10px] text-gold">
+                      <span className="ml-2 rounded-full bg-[color-mix(in_srgb,var(--color-accent-gold)_15%,transparent)] px-2 py-0.5 text-[10px] text-gold">
                         Benchmark
                       </span>
                     )}
