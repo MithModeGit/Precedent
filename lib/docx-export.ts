@@ -37,7 +37,9 @@ function stripTags(xml: string): string {
 }
 
 function normalize(text: string): string {
-  return text.replace(/\s+/g, ' ').trim().toLowerCase()
+  // Strip all whitespace so paragraph matching is robust to formatting differences
+  // introduced by mammoth, the PDF parser, or the model.
+  return text.replace(/\s+/g, '').toLowerCase()
 }
 
 interface Counter {
@@ -58,16 +60,24 @@ function buildTrackedChangesXml(
   for (const [op, text] of diffs) {
     const escaped = escapeXml(text)
     if (op === 0) {
-      xml += `<w:r><w:t xml:space="preserve">${escaped}</w:t></w:r>`
+      xml += `<w:r>${runContent(escaped, 'w:t')}</w:r>`
     } else if (op === -1) {
       const id = counter.value++
-      xml += `<w:del w:id="${id}" w:author="${AUTHOR}" w:date="${timestamp}"><w:r><w:delText xml:space="preserve">${escaped}</w:delText></w:r></w:del>`
+      xml += `<w:del w:id="${id}" w:author="${AUTHOR}" w:date="${timestamp}"><w:r>${runContent(escaped, 'w:delText')}</w:r></w:del>`
     } else {
       const id = counter.value++
-      xml += `<w:ins w:id="${id}" w:author="${AUTHOR}" w:date="${timestamp}"><w:r><w:t xml:space="preserve">${escaped}</w:t></w:r></w:ins>`
+      xml += `<w:ins w:id="${id}" w:author="${AUTHOR}" w:date="${timestamp}"><w:r>${runContent(escaped, 'w:t')}</w:r></w:ins>`
     }
   }
   return xml
+}
+
+/** Renders run text, converting newlines to <w:br/> so line breaks survive in Word. */
+function runContent(escaped: string, tag: 'w:t' | 'w:delText'): string {
+  return escaped
+    .split('\n')
+    .map((segment) => `<${tag} xml:space="preserve">${segment}</${tag}>`)
+    .join('<w:br/>')
 }
 
 function buildCommentsXml(comments: { id: number; rationale: string }[], timestamp: string): string {
