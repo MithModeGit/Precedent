@@ -4,6 +4,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -108,6 +109,28 @@ export function SessionProvider({
     },
     [decisions, orderedClauses],
   )
+
+  // Pass 3 evaluation: open the SSE stream once the interface mounts. When results
+  // arrive, update confidence signals and kick off the background Pass 4 improve run.
+  useEffect(() => {
+    const source = new EventSource(`/api/pipeline/evaluate?sessionId=${sessionId}`)
+    source.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data) as EvaluateOutput | { error: string }
+        if (!('error' in data)) {
+          setEvalResults(data)
+          void fetch(`/api/pipeline/improve?sessionId=${sessionId}`, { method: 'POST' }).catch(
+            () => undefined,
+          )
+        }
+      } catch {
+        // Ignore malformed events; the stream closes below.
+      }
+      source.close()
+    }
+    source.onerror = () => source.close()
+    return () => source.close()
+  }, [sessionId])
 
   const resolvedCount = useMemo(
     () => Object.values(decisions).filter((d) => isResolved(d.decision)).length,
