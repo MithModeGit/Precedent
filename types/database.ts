@@ -41,7 +41,7 @@ export interface Database {
       }
       eval_runs: {
         Row: EvalRunRow
-        Insert: Insert<EvalRunRow, 'id' | 'created_at' | 'improvement_notes'>
+        Insert: Insert<EvalRunRow, 'id' | 'created_at' | 'improvement_notes' | 'dimension_rationales'>
         Update: Partial<EvalRunRow>
         Relationships: []
       }

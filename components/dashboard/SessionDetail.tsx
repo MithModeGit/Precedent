@@ -4,16 +4,11 @@ import { useState } from 'react'
 import type { Decision, Priority } from '@/types'
 import type { EvaluateOutput } from '@/schemas/evaluate'
 import { clauseTypeLabel } from '@/lib/clause-labels'
+import { computeDiff } from '@/lib/diff'
+import { DIMENSION_GUIDE, type DimensionKey } from '@/lib/dimension-guide'
 import { PriorityBadge } from '@/components/ui/Badge'
-import { ScoreBadge, DimensionBar } from '@/components/dashboard/shared'
-
-const DIMENSIONS = [
-  { key: 'legalAccuracy', label: 'Legal Accuracy' },
-  { key: 'marketCalibration', label: 'Market Calibration' },
-  { key: 'redlinePrecision', label: 'Redline Precision' },
-  { key: 'explanationQuality', label: 'Explanation Quality' },
-  { key: 'proportionality', label: 'Proportionality' },
-] as const
+import { ScoreBadge } from '@/components/dashboard/shared'
+import { DimensionAccordion } from '@/components/eval/DimensionAccordion'
 
 const CHECKS = [
   { key: 'dtsaNotice', label: 'DTSA Notice' },
@@ -62,14 +57,48 @@ function DecisionBadge({ decision }: { decision: Decision | null }): React.React
   )
 }
 
+function DiffView({ original, proposed }: { original: string; proposed: string }): React.ReactElement {
+  return (
+    <p className="whitespace-pre-wrap rounded-md bg-surface-raised p-3 font-mono text-xs leading-5">
+      {computeDiff(original, proposed).map((seg, i) => {
+        if (seg.op === 'delete') {
+          return (
+            <span key={i} className="bg-diff-delete-bg text-diff-delete line-through">
+              {seg.text}
+            </span>
+          )
+        }
+        if (seg.op === 'insert') {
+          return (
+            <span key={i} className="bg-diff-insert-bg text-diff-insert underline">
+              {seg.text}
+            </span>
+          )
+        }
+        return <span key={i}>{seg.text}</span>
+      })}
+    </p>
+  )
+}
+
+/** The lowest-scoring dimension for a clause, to highlight where it is weakest. */
+function weakestDimension(dimensions: EvaluateOutput['dimensions']): DimensionKey {
+  return DIMENSION_GUIDE.reduce(
+    (lowest, d) => (dimensions[d.key] < dimensions[lowest] ? d.key : lowest),
+    DIMENSION_GUIDE[0]!.key,
+  )
+}
+
 function ClauseRow({ clause }: { clause: DetailClause }): React.ReactElement {
   const [open, setOpen] = useState(false)
+  const weakest = clause.dimensions ? weakestDimension(clause.dimensions) : null
   return (
     <div className="border-b border-border-subtle">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center gap-3 py-3 text-left"
+        aria-expanded={open}
+        className="flex w-full items-center gap-3 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-navy"
       >
         <span className="text-text-muted">{open ? '⌄' : '›'}</span>
         <span className="flex-1 text-sm text-text-primary">
@@ -81,33 +110,64 @@ function ClauseRow({ clause }: { clause: DetailClause }): React.ReactElement {
         <ScoreBadge score={clause.clauseOverallScore} />
       </button>
       {open && (
-        <div className="space-y-3 pb-4 pl-6">
+        <div className="space-y-4 pb-4 pl-6">
+          <div>
+            <p className="mb-1 text-xs uppercase tracking-widest text-text-muted">AI redline</p>
+            <DiffView original={clause.originalText} proposed={clause.proposedText} />
+          </div>
+
           {clause.dimensions && (
-            <div className="space-y-2">
-              {DIMENSIONS.map((d) => (
-                <DimensionBar key={d.key} label={d.label} score={clause.dimensions![d.key]} />
-              ))}
+            <div>
+              <p className="mb-2 text-xs uppercase tracking-widest text-text-muted">
+                Dimension scores
+              </p>
+              <div className="space-y-1.5">
+                {DIMENSION_GUIDE.map((d) => {
+                  const score = clause.dimensions![d.key]
+                  const isWeak = d.key === weakest && score < 5
+                  return (
+                    <div key={d.key} className="flex items-center gap-3">
+                      <span className="w-40 shrink-0 text-xs text-text-secondary">
+                        {d.label}
+                        {isWeak && (
+                          <span className="ml-1.5 rounded-full bg-must-bg px-1.5 text-[10px] text-must">
+                            weakest
+                          </span>
+                        )}
+                      </span>
+                      <span className="h-2 flex-1 rounded-full bg-surface-raised">
+                        <span
+                          className={`block h-2 rounded-full ${isWeak ? 'bg-must' : 'bg-navy'}`}
+                          style={{ width: `${(score / 5) * 100}%` }}
+                        />
+                      </span>
+                      <span className="w-8 shrink-0 text-right font-mono text-xs text-text-primary">
+                        {score}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
           )}
+
           {clause.evaluatorNote && (
-            <p className="text-sm text-text-secondary">{clause.evaluatorNote}</p>
+            <div>
+              <p className="mb-1 text-xs uppercase tracking-widest text-text-muted">
+                Evaluator assessment
+              </p>
+              <p className="text-sm leading-6 text-text-secondary">{clause.evaluatorNote}</p>
+            </div>
           )}
+
           {clause.decision === 'modified' && clause.acceptedText && (
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div>
-                <p className="mb-1 text-xs uppercase tracking-widest text-text-muted">AI proposed</p>
-                <p className="whitespace-pre-wrap rounded-md bg-surface-raised p-3 font-mono text-xs leading-5">
-                  {clause.proposedText}
-                </p>
-              </div>
-              <div>
-                <p className="mb-1 text-xs uppercase tracking-widest text-text-muted">
-                  Lawyer accepted
-                </p>
-                <p className="whitespace-pre-wrap rounded-md bg-surface-raised p-3 font-mono text-xs leading-5">
-                  {clause.acceptedText}
-                </p>
-              </div>
+            <div>
+              <p className="mb-1 text-xs uppercase tracking-widest text-text-muted">
+                Lawyer&apos;s accepted edit
+              </p>
+              <p className="whitespace-pre-wrap rounded-md bg-surface-raised p-3 font-mono text-xs leading-5">
+                {clause.acceptedText}
+              </p>
             </div>
           )}
         </div>
@@ -158,7 +218,7 @@ export function SessionDetail({ data }: { data: SessionDetailData }): React.Reac
                       <p className="text-xs text-text-secondary">{check.note}</p>
                     </div>
                     <span
-                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                      className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
                         pass ? 'bg-nice-bg text-nice' : 'bg-must-bg text-must'
                       }`}
                     >
@@ -171,14 +231,18 @@ export function SessionDetail({ data }: { data: SessionDetailData }): React.Reac
           </div>
 
           <div className="rounded-md border border-border bg-surface p-6 shadow-sm">
-            <p className="mb-4 text-sm font-semibold uppercase tracking-widest text-text-secondary">
+            <p className="mb-1 text-sm font-semibold uppercase tracking-widest text-text-secondary">
               Dimension scores
             </p>
-            <div className="space-y-3">
-              {DIMENSIONS.map((d) => (
-                <DimensionBar key={d.key} label={d.label} score={evalRun.dimensions[d.key]} />
-              ))}
-            </div>
+            <p className="mb-4 text-xs text-text-muted">
+              Select a dimension to see what it measures, what the score level means, and the
+              evaluator&apos;s evidence for this document.
+            </p>
+            <DimensionAccordion
+              dimensions={evalRun.dimensions}
+              rationales={evalRun.dimensionRationales}
+              clauseScores={evalRun.clauseScores}
+            />
           </div>
 
           {evalRun.improvementNotes.length > 0 && (
