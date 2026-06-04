@@ -159,7 +159,9 @@ export async function getDashboardData(): Promise<DashboardData> {
   for (const cs of clauseScores ?? []) {
     for (const col of DIM_COLS) {
       const v = cs[col]
-      if (v >= 1 && v <= 5) scoreDistribution[v] = (scoreDistribution[v] ?? 0) + 1
+      if (Number.isInteger(v) && v >= 1 && v <= 5) {
+        scoreDistribution[v] = (scoreDistribution[v] ?? 0) + 1
+      }
     }
   }
 

@@ -128,11 +128,12 @@ export function TrendOverview({
   // Weakest dimension this period: the lowest current average, to point the team at it.
   const weakestDimension = useMemo(() => {
     if (!cur.dimensions) return null
-    return DIMENSIONS.reduce(
-      (low, d) =>
-        (cur.dimensions![d.key] ?? 5) < (cur.dimensions![low.key] ?? 5) ? d : low,
+    const lowest = DIMENSIONS.reduce(
+      (low, d) => ((cur.dimensions![d.key] ?? 5) < (cur.dimensions![low.key] ?? 5) ? d : low),
       DIMENSIONS[0],
     )
+    // Only surface a "weakest" if it actually has room to improve (not a perfect 5).
+    return (cur.dimensions[lowest.key] ?? 5) < 5 ? lowest : null
   }, [cur.dimensions])
 
   const distTotal = useMemo(

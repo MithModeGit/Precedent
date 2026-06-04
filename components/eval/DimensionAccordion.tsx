@@ -12,7 +12,7 @@ function lowestClauses(
   key: DimensionKey,
 ): EvaluateOutput['clauseScores'] {
   return [...(clauseScores ?? [])]
-    .filter((c) => c.dimensions?.[key] != null && c.dimensions[key] < 5)
+    .filter((c) => (c.dimensions?.[key] ?? 5) < 5)
     .sort((a, b) => (a.dimensions?.[key] ?? 0) - (b.dimensions?.[key] ?? 0))
     .slice(0, 3)
 }
@@ -99,7 +99,7 @@ function Row({
                           {clauseTypeLabel(c.clauseType)}
                         </span>
                         <span className="ml-2 font-mono text-xs text-text-muted">
-                          {c.sectionNumber} · {c.dimensions[dimensionKey]}/5
+                          {c.sectionNumber} · {c.dimensions?.[dimensionKey] ?? 0}/5
                         </span>
                       </li>
                     ))}
