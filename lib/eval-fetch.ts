@@ -49,6 +49,14 @@ export async function getStoredEval(sessionId: string): Promise<EvaluateOutput |
     }
   })
 
+  const emptyRationales: EvaluateOutput['dimensionRationales'] = {
+    legalAccuracy: '',
+    marketCalibration: '',
+    redlinePrecision: '',
+    explanationQuality: '',
+    proportionality: '',
+  }
+
   return {
     overallScore: Number(run.overall_score),
     dimensions: {
@@ -57,6 +65,12 @@ export async function getStoredEval(sessionId: string): Promise<EvaluateOutput |
       redlinePrecision: run.redline_precision,
       explanationQuality: run.explanation_quality,
       proportionality: run.proportionality,
+    },
+    // Merge over defaults so all five keys are always present, even for older runs whose
+    // stored value is the default empty object {}.
+    dimensionRationales: {
+      ...emptyRationales,
+      ...((run.dimension_rationales as Partial<EvaluateOutput['dimensionRationales']>) ?? {}),
     },
     binaryChecks: {
       dtsaNotice: { result: run.dtsa_check, note: run.dtsa_note },

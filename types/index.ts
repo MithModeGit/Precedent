@@ -149,6 +149,7 @@ export type EvalRunRow = {
   consistency_check: BinaryResult
   consistency_note: string
   improvement_notes: string[]
+  dimension_rationales: Record<string, string>
 }
 
 export type EvalClauseScoreRow = {

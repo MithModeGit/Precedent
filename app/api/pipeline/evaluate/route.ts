@@ -72,6 +72,7 @@ async function persist(sessionId: string, scored: EvaluateOutput): Promise<void>
       consistency_check: b.internalConsistency.result,
       consistency_note: b.internalConsistency.note,
       improvement_notes: scored.improvementNotes,
+      dimension_rationales: scored.dimensionRationales,
     })
     .select('id')
   if (runError || !runRows?.[0]) {
