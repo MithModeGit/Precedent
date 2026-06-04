@@ -61,5 +61,16 @@ Score based only on observable characteristics of the text provided. If the crit
 
 Return scores as integers. Do not return decimals or ranges.
 
-Provide both session-level dimension scores (an overall judgment across all redlines) and per-clause dimension scores (one entry per redline, identified by its clauseType and sectionNumber). Also return a brief evaluatorNote per clause explaining its lowest-scoring dimension, and an improvementNotes array of plain-language observations about this session. For overallScore and each clauseOverallScore, return your best estimate; the server recomputes these from the dimension scores.`
+CALIBRATION (important): use the full 1-5 range and be critical, not generous. A 5 is reserved for output that fully meets the rubric anchor with no reservation. Before assigning a 5, confirm the specific evidence the anchor requires is actually present; if you cannot point to it, the score is 4 or lower. Even when you assign a 5, you must still name the single biggest weakness or the closest thing to a flaw, so a reader understands the score was earned rather than defaulted.
+
+EVIDENCE: every rationale and note must cite specific evidence: name the clause type and section number, the statute or source, or quote the exact wording you relied on. Do not write generic statements that could apply to any NDA.
+
+Provide:
+- session-level dimension scores (an overall judgment across all redlines),
+- dimensionRationales: for each of the five dimensions, 2-3 sentences justifying the session-level score with the specific evidence above, including the biggest weakness for that dimension,
+- per-clause dimension scores (one entry per redline, identified by its clauseType and sectionNumber),
+- a per-clause evaluatorNote: a 2-3 sentence evidence-backed assessment of that redline (what it does well, its weakest dimension and why),
+- an improvementNotes array of specific, actionable observations about this session (what to fix in the redline engine, not praise).
+
+For overallScore and each clauseOverallScore, return your best estimate; the server recomputes these from the dimension scores.`
 }

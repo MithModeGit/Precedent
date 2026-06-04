@@ -13,6 +13,14 @@ const DimensionScores = z.object({
   proportionality: DimensionScore,
 })
 
+const DimensionRationales = z.object({
+  legalAccuracy: z.string(),
+  marketCalibration: z.string(),
+  redlinePrecision: z.string(),
+  explanationQuality: z.string(),
+  proportionality: z.string(),
+})
+
 export const EvaluateOutputSchema = z.object({
   overallScore: z
     .number()
@@ -20,6 +28,9 @@ export const EvaluateOutputSchema = z.object({
       'Weighted average of the five dimension scores, capped at 3.0 if two or more binary checks fail',
     ),
   dimensions: DimensionScores,
+  dimensionRationales: DimensionRationales.describe(
+    'For each dimension, 2-3 sentences justifying the session-level score with specific evidence from the redlines (cite clause types, section numbers, statutes, or the exact wording you relied on). Name the single biggest weakness for that dimension even when the score is 5.',
+  ),
   binaryChecks: z.object({
     dtsaNotice: z.object({ result: BinaryCheck, note: z.string() }),
     california1660: z.object({ result: BinaryCheck, note: z.string() }),
@@ -37,7 +48,7 @@ export const EvaluateOutputSchema = z.object({
       evaluatorNote: z
         .string()
         .describe(
-          'One sentence explaining the lowest-scoring dimension for this clause, or confirming all dimensions scored well.',
+          "A 2-3 sentence evidence-backed assessment of this clause's redline: what it does well, what its weakest dimension is and why, citing the specific wording, statute, or market position you relied on. Be specific to this redline, not generic.",
         ),
     }),
   ),

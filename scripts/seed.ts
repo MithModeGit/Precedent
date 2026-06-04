@@ -217,6 +217,7 @@ async function seedOne(b: Benchmark): Promise<void> {
       consistency_check: b3.internalConsistency.result,
       consistency_note: b3.internalConsistency.note,
       improvement_notes: evalOut.improvementNotes,
+      dimension_rationales: evalOut.dimensionRationales,
     })
     .select('id')
   const evalRunId = runRows?.[0]?.id

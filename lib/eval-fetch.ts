@@ -49,6 +49,14 @@ export async function getStoredEval(sessionId: string): Promise<EvaluateOutput |
     }
   })
 
+  const emptyRationales: EvaluateOutput['dimensionRationales'] = {
+    legalAccuracy: '',
+    marketCalibration: '',
+    redlinePrecision: '',
+    explanationQuality: '',
+    proportionality: '',
+  }
+
   return {
     overallScore: Number(run.overall_score),
     dimensions: {
@@ -58,6 +66,8 @@ export async function getStoredEval(sessionId: string): Promise<EvaluateOutput |
       explanationQuality: run.explanation_quality,
       proportionality: run.proportionality,
     },
+    dimensionRationales:
+      (run.dimension_rationales as EvaluateOutput['dimensionRationales'] | null) ?? emptyRationales,
     binaryChecks: {
       dtsaNotice: { result: run.dtsa_check, note: run.dtsa_note },
       california1660: { result: run.ca_1660_check, note: run.ca_1660_note },
