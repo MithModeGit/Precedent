@@ -66,7 +66,7 @@ export async function POST(request: NextRequest): Promise<NextResponse | Respons
         acceptedText: r.accepted_text as string,
         rationale: r.rationale,
       }))
-      buffer = await generateFreshRedlinedDocx(session.document_name, redlines)
+      buffer = await generateFreshRedlinedDocx(session.document_name ?? 'Document', redlines)
     }
   } catch (error) {
     console.error(`Export generation failed: ${error instanceof Error ? error.message : 'unknown'}`)
