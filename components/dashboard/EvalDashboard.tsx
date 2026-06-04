@@ -43,6 +43,7 @@ export function EvalDashboard({
         <TrendOverview
           sessions={data.sessions}
           clausePerformance={data.clausePerformance}
+          scoreDistribution={data.scoreDistribution}
           now={now}
         />
       ) : (
