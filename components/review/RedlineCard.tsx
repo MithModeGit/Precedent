@@ -68,18 +68,31 @@ export function RedlineCard({ clause }: { clause: ClauseReview }): React.ReactEl
   const state = decisions[clause.id]
   const decision = state?.decision ?? null
 
+  // The text the lawyer has committed to: their edit if this clause was modified,
+  // otherwise the AI's proposal. The card renders this so a saved modification is
+  // reflected back, and re-editing starts from the saved version.
+  const committedText =
+    decision === 'modified' && state?.acceptedText != null ? state.acceptedText : clause.proposedText
+
   const [isModifying, setIsModifying] = useState(false)
-  const [draft, setDraft] = useState(clause.proposedText)
-  const [debouncedDraft, setDebouncedDraft] = useState(clause.proposedText)
+  const [draft, setDraft] = useState(committedText)
+  const [debouncedDraft, setDebouncedDraft] = useState(committedText)
   const [showPrediction, setShowPrediction] = useState(false)
 
-  // Reset local state when the active clause changes.
+  // Reset modify/prediction state when the active clause changes.
   useEffect(() => {
     setIsModifying(false)
-    setDraft(clause.acceptedText ?? clause.proposedText)
-    setDebouncedDraft(clause.acceptedText ?? clause.proposedText)
     setShowPrediction(false)
-  }, [clause.id, clause.acceptedText, clause.proposedText])
+  }, [clause.id])
+
+  // Sync the draft to the committed text whenever not editing, so cancelling an edit
+  // (or arriving at the clause) restores the saved version rather than an abandoned draft.
+  useEffect(() => {
+    if (!isModifying) {
+      setDraft(committedText)
+      setDebouncedDraft(committedText)
+    }
+  }, [committedText, isModifying])
 
   // Debounce the live diff while editing (300ms).
   useEffect(() => {
@@ -145,7 +158,7 @@ export function RedlineCard({ clause }: { clause: ClauseReview }): React.ReactEl
             </div>
           </div>
         ) : (
-          <DiffView original={clause.originalText} proposed={clause.proposedText} />
+          <DiffView original={clause.originalText} proposed={committedText} />
         )}
       </div>
 
