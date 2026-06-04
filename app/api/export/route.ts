@@ -82,7 +82,7 @@ export async function POST(request: NextRequest): Promise<NextResponse | Respons
   // user-supplied, so strip anything outside a safe set to prevent header injection
   // (CR/LF) or a broken quoted-string (embedded quotes).
   const safeBase =
-    session.document_name
+    (session.document_name ?? '')
       .replace(/\.[^.]+$/, '')
       .replace(/[^a-zA-Z0-9 ._-]/g, '')
       .trim()
