@@ -1,9 +1,21 @@
 'use client'
 
+import { useEffect } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/Button'
 
-export default function Error({ reset }: { error: Error & { digest?: string }; reset: () => void }): React.ReactElement {
+export default function Error({
+  error,
+  reset,
+}: {
+  error: Error & { digest?: string }
+  reset: () => void
+}): React.ReactElement {
+  // Log the error (with its digest) for diagnosis: the standard Next.js error-boundary pattern.
+  useEffect(() => {
+    console.error('Route error boundary:', error)
+  }, [error])
+
   return (
     <main className="mx-auto flex max-w-xl flex-col items-center px-6 py-24 text-center">
       <h1 className="font-display text-2xl text-text-primary">Something went wrong</h1>
