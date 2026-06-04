@@ -15,6 +15,7 @@ import {
 export const runtime = 'nodejs'
 export const maxDuration = 300
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const round2 = (n: number): number => Math.round(n * 100) / 100
 
 /** Builds the SSE payload, applying server-computed overall scores and confidence signals. */
@@ -39,13 +40,17 @@ async function persist(sessionId: string, scored: EvaluateOutput): Promise<void>
     .from('clause_reviews')
     .select('id, clause_type, section_number')
     .eq('session_id', sessionId)
+  // Normalize the match key so trivial whitespace/case differences in the section number
+  // (model-echoed vs stored) do not silently drop a clause's per-clause scores.
+  const keyOf = (clauseType: string, sectionNumber: string): string =>
+    `${clauseType}|${sectionNumber.trim().toLowerCase().replace(/\s+/g, ' ')}`
   const idByKey = new Map<string, string>()
-  for (const r of reviews ?? []) idByKey.set(`${r.clause_type}|${r.section_number}`, r.id)
+  for (const r of reviews ?? []) idByKey.set(keyOf(r.clause_type, r.section_number), r.id)
 
   const b = scored.binaryChecks
-  // One eval run per session: replace any existing run (cascade clears clause scores).
-  const { error: deleteError } = await supabase.from('eval_runs').delete().eq('session_id', sessionId)
-  if (deleteError) console.error(`Failed to delete existing eval run: ${deleteError.message}`)
+  // One eval run per session. Insert the new run first, then prune older runs (cascade
+  // clears their clause scores). Doing it in this order means a failed insert never leaves
+  // the session with no eval at all, unlike a delete-then-insert.
   const { data: runRows, error: runError } = await supabase
     .from('eval_runs')
     .insert({
@@ -75,9 +80,17 @@ async function persist(sessionId: string, scored: EvaluateOutput): Promise<void>
   }
   const evalRunId = runRows[0].id
 
+  // Remove any superseded runs for this session (cascades their clause scores).
+  const { error: pruneError } = await supabase
+    .from('eval_runs')
+    .delete()
+    .eq('session_id', sessionId)
+    .neq('id', evalRunId)
+  if (pruneError) console.error(`Failed to prune old eval runs: ${pruneError.message}`)
+
   const clauseRows = scored.clauseScores
     .map((cs) => {
-      const clauseReviewId = idByKey.get(`${cs.clauseType}|${cs.sectionNumber}`)
+      const clauseReviewId = idByKey.get(keyOf(cs.clauseType, cs.sectionNumber))
       if (!clauseReviewId) return null
       return {
         eval_run_id: evalRunId,
@@ -107,7 +120,7 @@ export async function GET(request: NextRequest): Promise<Response> {
   const stream = new ReadableStream({
     async start(controller) {
       try {
-        if (!sessionId) throw new Error('Missing sessionId')
+        if (!sessionId || !UUID_RE.test(sessionId)) throw new Error('Invalid sessionId')
 
         // Return the stored evaluation if one exists: Pass 3 should run once per
         // session, not on every review-page reload.

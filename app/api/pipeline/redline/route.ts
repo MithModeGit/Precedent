@@ -117,9 +117,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Could not create the review session.' }, { status: 500 })
   }
 
-  // Enforce mode semantics: keep only the priority tiers this mode includes.
+  // Enforce mode semantics: keep only the priority tiers this mode includes, and drop
+  // no-op redlines (the model emits noActionNeeded clauses whose proposed text equals the
+  // original). Persisting those would create empty-diff review cards and inflate the
+  // "Reviewed X of Y" count and the acceptance-rate denominator.
   const allowedTiers = TIERS_BY_MODE[body.mode]
-  const redlines = redlineOutput.redlines.filter((r) => allowedTiers.includes(r.priority))
+  const redlines = redlineOutput.redlines.filter(
+    (r) =>
+      allowedTiers.includes(r.priority) &&
+      !r.noActionNeeded &&
+      r.proposedText.trim() !== r.originalText.trim(),
+  )
 
   if (redlines.length === 0) {
     return NextResponse.json({ sessionId: body.sessionId, redlineCount: 0 })
