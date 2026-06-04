@@ -71,6 +71,11 @@ export async function getStoredEval(sessionId: string): Promise<EvaluateOutput |
       explanationQuality: storedRationales.explanationQuality ?? '',
       proportionality: storedRationales.proportionality ?? '',
     },
+    issueCoverage: {
+      score: run.issue_coverage ?? 5,
+      rationale: run.issue_coverage_rationale ?? '',
+      missedIssues: run.missed_issues ?? [],
+    },
     binaryChecks: {
       dtsaNotice: { result: run.dtsa_check, note: run.dtsa_note },
       california1660: { result: run.ca_1660_check, note: run.ca_1660_note },

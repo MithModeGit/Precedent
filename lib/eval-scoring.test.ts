@@ -3,6 +3,7 @@ import {
   weightedDimensionScore,
   failedCheckCount,
   calculateOverallScore,
+  fBetaScore,
   getConfidenceSignal,
   clauseHasFailedBinaryCheck,
   DIMENSION_WEIGHTS,
@@ -58,19 +59,40 @@ describe('failedCheckCount', () => {
   })
 })
 
+describe('fBetaScore', () => {
+  it('returns 5 when both inputs are 5', () => {
+    expect(fBetaScore(5, 5)).toBeCloseTo(5)
+  })
+  it('is smoothly non-compensatory: high precision cannot mask low coverage', () => {
+    // P=5, coverage=3 with beta=2 -> ~3.22, between min(=3) and arithmetic(=4).
+    expect(fBetaScore(5, 3)).toBeCloseTo(3.22, 1)
+  })
+  it('weights recall higher than precision (beta=2)', () => {
+    // Catching everything with rough edits outranks perfect edits that miss things.
+    expect(fBetaScore(3, 5)).toBeGreaterThan(fBetaScore(5, 3))
+  })
+  it('floors to 1 when either axis is at the bottom of the scale', () => {
+    expect(fBetaScore(5, 1)).toBeCloseTo(1)
+    expect(fBetaScore(1, 5)).toBeCloseTo(1)
+  })
+})
+
 describe('calculateOverallScore', () => {
-  it('does not cap with fewer than two failures', () => {
-    expect(calculateOverallScore(dims(5, 5, 5, 5, 5), ALL_PASS)).toBe(5)
-    expect(calculateOverallScore(dims(5, 5, 5, 5, 5), checks('FAIL', 'PASS', 'PASS', 'PASS', 'PASS'))).toBe(5)
+  it('returns 5 with perfect dimensions, full coverage, and no failures', () => {
+    expect(calculateOverallScore(dims(5, 5, 5, 5, 5), ALL_PASS, 5)).toBe(5)
+    expect(calculateOverallScore(dims(5, 5, 5, 5, 5), checks('FAIL', 'PASS', 'PASS', 'PASS', 'PASS'), 5)).toBe(5)
+  })
+  it('drops when coverage is low even with perfect redline quality', () => {
+    expect(calculateOverallScore(dims(5, 5, 5, 5, 5), ALL_PASS, 3)).toBeCloseTo(3.22, 1)
   })
   it('caps at 3.0 when two or more checks fail', () => {
     expect(
-      calculateOverallScore(dims(5, 5, 5, 5, 5), checks('FAIL', 'FAIL', 'PASS', 'PASS', 'PASS')),
+      calculateOverallScore(dims(5, 5, 5, 5, 5), checks('FAIL', 'FAIL', 'PASS', 'PASS', 'PASS'), 5),
     ).toBe(3)
   })
   it('is a ceiling, not a floor: a low score below 3 is unchanged by the cap', () => {
     expect(
-      calculateOverallScore(dims(2, 2, 2, 2, 2), checks('FAIL', 'FAIL', 'FAIL', 'PASS', 'PASS')),
+      calculateOverallScore(dims(2, 2, 2, 2, 2), checks('FAIL', 'FAIL', 'FAIL', 'PASS', 'PASS'), 2),
     ).toBe(2)
   })
 })

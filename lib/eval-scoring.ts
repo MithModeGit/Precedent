@@ -4,7 +4,7 @@ import type { EvaluateOutput } from '@/schemas/evaluate'
 type Dimensions = EvaluateOutput['dimensions']
 type BinaryChecks = EvaluateOutput['binaryChecks']
 
-/** Dimension weights for the overall score (PRD §5.6). Sum to 1.0. */
+/** Dimension weights for the precision score (PRD §5.6). Sum to 1.0. */
 export const DIMENSION_WEIGHTS: Record<keyof Dimensions, number> = {
   legalAccuracy: 0.3,
   marketCalibration: 0.25,
@@ -13,7 +13,16 @@ export const DIMENSION_WEIGHTS: Record<keyof Dimensions, number> = {
   proportionality: 0.1,
 }
 
-/** Weighted average of the five dimension scores. */
+/**
+ * Recall is weighted higher than precision when combining the two: in legal review a
+ * missed issue is worse than a mediocre edit (a lawyer can polish a redline but cannot fix
+ * what was never flagged). beta = 2 weights coverage ~2x the precision score.
+ */
+export const RECALL_BETA = 2
+
+const round2 = (n: number): number => Math.round(n * 100) / 100
+
+/** Precision: weighted average of the five redline-quality dimension scores (1-5). */
 export function weightedDimensionScore(dimensions: Dimensions): number {
   return (
     dimensions.legalAccuracy * DIMENSION_WEIGHTS.legalAccuracy +
@@ -30,13 +39,34 @@ export function failedCheckCount(binaryChecks: BinaryChecks): number {
 }
 
 /**
- * Overall session score: weighted dimension average, capped at 3.0 when two or
- * more binary checks fail (PRD §5.6). Rounded to two decimals for storage.
+ * Recall-weighted harmonic mean (F-beta) of two 1-5 scores, returned on the 1-5 scale.
+ * Smoothly non-compensatory: a low score on either axis drags the result down and cannot
+ * be bought back by a high score on the other. Inputs are normalized to [0,1] via
+ * (x-1)/4, combined with F-beta, then mapped back to 1-5.
  */
-export function calculateOverallScore(dimensions: Dimensions, binaryChecks: BinaryChecks): number {
-  const weighted = weightedDimensionScore(dimensions)
-  const capped = failedCheckCount(binaryChecks) >= 2 ? Math.min(weighted, 3.0) : weighted
-  return Math.round(capped * 100) / 100
+export function fBetaScore(precision: number, coverage: number, beta = RECALL_BETA): number {
+  const p = (precision - 1) / 4
+  const r = (coverage - 1) / 4
+  const b2 = beta * beta
+  const denom = b2 * p + r
+  const f = denom <= 0 ? 0 : ((1 + b2) * p * r) / denom
+  return 1 + 4 * f
+}
+
+/**
+ * Overall session score: a recall-weighted F-score of the precision (weighted dimension
+ * average) and the issue-coverage score, then gated to at most 3.0 when two or more binary
+ * compliance checks fail (PRD §5.6). Rounded to two decimals for storage.
+ */
+export function calculateOverallScore(
+  dimensions: Dimensions,
+  binaryChecks: BinaryChecks,
+  issueCoverage: number,
+): number {
+  const precision = weightedDimensionScore(dimensions)
+  let overall = fBetaScore(precision, issueCoverage)
+  if (failedCheckCount(binaryChecks) >= 2) overall = Math.min(overall, 3.0)
+  return round2(overall)
 }
 
 /** Per-clause confidence signal mapping (AI_PIPELINE.md). */
