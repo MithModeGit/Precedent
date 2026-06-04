@@ -9,6 +9,7 @@ import { DocumentPanel } from '@/components/review/DocumentPanel'
 import { RedlineCard } from '@/components/review/RedlineCard'
 import { CriticalIssuesPanel } from '@/components/review/CriticalIssuesPanel'
 import { RunningLog } from '@/components/review/RunningLog'
+import { QualityReport } from '@/components/review/QualityReport'
 import type { SortOrder } from '@/lib/clause-ordering'
 
 const PERSPECTIVE_LABEL = { disclosing: 'Disclosing Party', receiving: 'Receiving Party' } as const
@@ -129,6 +130,44 @@ function ActiveCard(): React.ReactElement {
   )
 }
 
+type RightTab = 'redlines' | 'quality'
+
+function RightPanel(): React.ReactElement {
+  const [tab, setTab] = useState<RightTab>('redlines')
+  const tabs: { value: RightTab; label: string }[] = [
+    { value: 'redlines', label: 'Redlines' },
+    { value: 'quality', label: 'Quality Report' },
+  ]
+  return (
+    <div className="flex min-h-0 w-3/5 min-w-0 flex-col">
+      <div className="flex gap-4 border-b border-border bg-surface px-6">
+        {tabs.map((t) => (
+          <button
+            key={t.value}
+            type="button"
+            onClick={() => setTab(t.value)}
+            className={`-mb-px border-b-2 py-2 text-sm font-medium ${
+              tab === t.value
+                ? 'border-navy text-text-primary'
+                : 'border-transparent text-text-secondary'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+      {tab === 'redlines' ? (
+        <div className="flex min-h-0 flex-1 flex-col">
+          <CriticalIssuesPanel />
+          <ActiveCard />
+        </div>
+      ) : (
+        <QualityReport />
+      )}
+    </div>
+  )
+}
+
 export function ReviewInterface({
   session,
   clauses,
@@ -141,13 +180,10 @@ export function ReviewInterface({
       <div className="flex h-screen flex-col">
         <Header session={session} />
         <div className="flex min-h-0 flex-1">
-          <div className="w-2/5 min-w-0 border-r border-border">
+          <div className="w-2/5 min-w-0 overflow-hidden border-r border-border">
             <DocumentPanel />
           </div>
-          <div className="flex w-3/5 min-w-0 flex-col">
-            <CriticalIssuesPanel />
-            <ActiveCard />
-          </div>
+          <RightPanel />
           <RunningLog />
         </div>
       </div>
