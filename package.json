@@ -8,6 +8,7 @@
     "start": "next start",
     "type-check": "tsc --noEmit",
     "lint": "next lint",
+    "test": "vitest run",
     "seed": "tsx scripts/seed.ts"
   },
   "dependencies": {
@@ -39,6 +40,7 @@
     "postcss": "^8.5.1",
     "tailwindcss": "^3.4.17",
     "tsx": "^4.19.2",
-    "typescript": "^5.7.3"
+    "typescript": "^5.7.3",
+    "vitest": "^2.1.9"
   }
 }
