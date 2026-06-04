@@ -66,6 +66,6 @@ export async function getStoredEval(sessionId: string): Promise<EvaluateOutput |
       internalConsistency: { result: run.consistency_check, note: run.consistency_note },
     },
     clauseScores,
-    improvementNotes: run.improvement_notes,
+    improvementNotes: run.improvement_notes ?? [],
   }
 }

@@ -91,7 +91,7 @@ export function QualityReport(): React.ReactElement {
         </ul>
       </div>
 
-      {evalResults.improvementNotes.length > 0 && (
+      {evalResults.improvementNotes && evalResults.improvementNotes.length > 0 && (
         <div>
           <p className="mb-3 text-sm font-semibold uppercase tracking-widest text-text-secondary">
             Observations

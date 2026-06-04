@@ -41,10 +41,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       pass: 4,
     })
 
-    await supabase
+    const { error: updateError } = await supabase
       .from('eval_runs')
       .update({ improvement_notes: output.notes })
       .eq('session_id', sessionId)
+    if (updateError) throw new Error(`Failed to update improvement notes: ${updateError.message}`)
 
     return NextResponse.json({ ok: true })
   } catch (error) {

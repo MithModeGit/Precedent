@@ -44,7 +44,8 @@ async function persist(sessionId: string, scored: EvaluateOutput): Promise<void>
 
   const b = scored.binaryChecks
   // One eval run per session: replace any existing run (cascade clears clause scores).
-  await supabase.from('eval_runs').delete().eq('session_id', sessionId)
+  const { error: deleteError } = await supabase.from('eval_runs').delete().eq('session_id', sessionId)
+  if (deleteError) console.error(`Failed to delete existing eval run: ${deleteError.message}`)
   const { data: runRows, error: runError } = await supabase
     .from('eval_runs')
     .insert({
