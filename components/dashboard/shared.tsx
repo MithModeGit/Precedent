@@ -3,7 +3,9 @@ import type { BinaryResult } from '@/types'
 /** Score badge colored by performance tier (PRD dashboard tiers). */
 export function ScoreBadge({ score }: { score: number | null }): React.ReactElement {
   if (score === null) {
-    return <span className="rounded-full bg-surface-raised px-2 py-0.5 text-xs text-text-muted">—</span>
+    return (
+      <span className="rounded-full bg-surface-raised px-2 py-0.5 text-xs text-text-muted">N/A</span>
+    )
   }
   const cls =
     score >= 4 ? 'bg-nice-bg text-nice' : score >= 3 ? 'bg-should-bg text-should' : 'bg-must-bg text-must'
@@ -14,16 +16,31 @@ export function ScoreBadge({ score }: { score: number | null }): React.ReactElem
   )
 }
 
-/** Row of five pass/fail dots for the binary checks. */
+/** Labels for the five binary checks, in the fixed order callers pass them. */
+const BINARY_LABELS = [
+  'DTSA Notice',
+  'California §16600',
+  'Trade Secret Bifurcation',
+  'AI Training Carve-out',
+  'Internal Consistency',
+]
+
+/** Row of five pass/fail dots for the binary checks, each labeled for screen readers. */
 export function BinaryDots({ results }: { results: BinaryResult[] }): React.ReactElement {
   return (
     <span className="inline-flex gap-1">
-      {results.map((r, i) => (
-        <span
-          key={i}
-          className={`h-2 w-2 rounded-full ${r === 'PASS' ? 'bg-nice' : 'bg-must'}`}
-        />
-      ))}
+      {results.map((r, i) => {
+        const label = `${BINARY_LABELS[i] ?? 'Check'}: ${r === 'PASS' ? 'pass' : 'fail'}`
+        return (
+          <span
+            key={i}
+            role="img"
+            aria-label={label}
+            title={label}
+            className={`h-2 w-2 rounded-full ${r === 'PASS' ? 'bg-nice' : 'bg-must'}`}
+          />
+        )
+      })}
     </span>
   )
 }
@@ -31,9 +48,27 @@ export function BinaryDots({ results }: { results: BinaryResult[] }): React.Reac
 type TrendDirection = 'up' | 'down' | 'flat'
 
 function TrendIndicator({ direction }: { direction: TrendDirection }): React.ReactElement {
-  if (direction === 'up') return <span className="text-nice">▲</span>
-  if (direction === 'down') return <span className="text-must">▼</span>
-  return <span className="text-text-muted">—</span>
+  if (direction === 'up') {
+    return (
+      <span className="text-nice" role="img" aria-label="trending up">
+        ▲
+      </span>
+    )
+  }
+  if (direction === 'down') {
+    return (
+      <span className="text-must" role="img" aria-label="trending down">
+        ▼
+      </span>
+    )
+  }
+  return (
+    <span
+      className="inline-block h-px w-2.5 bg-text-muted align-middle"
+      role="img"
+      aria-label="no change"
+    />
+  )
 }
 
 export function StatCard({

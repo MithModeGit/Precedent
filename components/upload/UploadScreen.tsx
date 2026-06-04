@@ -142,6 +142,7 @@ export function UploadScreen(): React.ReactElement {
           <div
             role="button"
             tabIndex={0}
+            aria-label="Upload a DOCX or PDF document, or drop a file here"
             onDragOver={(e) => e.preventDefault()}
             onDrop={(e) => {
               e.preventDefault()
@@ -154,12 +155,13 @@ export function UploadScreen(): React.ReactElement {
                 inputRef.current?.click()
               }
             }}
-            className="cursor-pointer rounded-md border border-dashed border-border bg-surface p-8 text-center"
+            className="cursor-pointer rounded-md border border-dashed border-border bg-surface p-8 text-center focus-visible:border-navy focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-navy"
           >
             <input
               ref={inputRef}
               type="file"
               accept=".pdf,.docx"
+              aria-label="Choose a DOCX or PDF document"
               className="hidden"
               onChange={(e) => selectFile(e.target.files?.[0])}
             />
