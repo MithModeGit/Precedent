@@ -117,6 +117,7 @@ function ClauseRow({ clause }: { clause: DetailClause }): React.ReactElement {
 }
 
 export function SessionDetail({ data }: { data: SessionDetailData }): React.ReactElement {
+  const evalRun = data.evalRun
   return (
     <div className="space-y-8">
       <div className="flex items-start justify-between">
@@ -129,14 +130,15 @@ export function SessionDetail({ data }: { data: SessionDetailData }): React.Reac
               month: 'long',
               day: 'numeric',
               year: 'numeric',
+              timeZone: 'UTC',
             })}{' '}
             · {data.documentType} · {data.governingLaw} · {data.mode} · {data.partyPerspective}
           </p>
         </div>
-        <ScoreBadge score={data.evalRun?.overallScore ?? null} />
+        <ScoreBadge score={evalRun?.overallScore ?? null} />
       </div>
 
-      {data.evalRun ? (
+      {evalRun ? (
         <>
           <div className="rounded-md border border-border bg-surface p-6 shadow-sm">
             <p className="mb-4 text-sm font-semibold uppercase tracking-widest text-text-secondary">
@@ -144,7 +146,7 @@ export function SessionDetail({ data }: { data: SessionDetailData }): React.Reac
             </p>
             <ul className="space-y-2">
               {CHECKS.map((c) => {
-                const check = data.evalRun!.binaryChecks[c.key]
+                const check = evalRun.binaryChecks[c.key]
                 const pass = check.result === 'PASS'
                 return (
                   <li
@@ -174,18 +176,18 @@ export function SessionDetail({ data }: { data: SessionDetailData }): React.Reac
             </p>
             <div className="space-y-3">
               {DIMENSIONS.map((d) => (
-                <DimensionBar key={d.key} label={d.label} score={data.evalRun!.dimensions[d.key]} />
+                <DimensionBar key={d.key} label={d.label} score={evalRun.dimensions[d.key]} />
               ))}
             </div>
           </div>
 
-          {data.evalRun.improvementNotes.length > 0 && (
+          {evalRun.improvementNotes.length > 0 && (
             <div className="rounded-md border border-border bg-surface p-6 shadow-sm">
               <p className="mb-4 text-sm font-semibold uppercase tracking-widest text-text-secondary">
                 Improvement notes
               </p>
               <div className="space-y-2">
-                {data.evalRun.improvementNotes.map((note, i) => (
+                {evalRun.improvementNotes.map((note, i) => (
                   <blockquote
                     key={i}
                     className="border-l-2 border-border pl-3 text-sm leading-6 text-text-secondary"

@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
-import type { BinaryResult } from '@/types'
 import type { SessionWithEval } from '@/lib/dashboard-queries'
 import { ScoreBadge, BinaryDots } from '@/components/dashboard/shared'
 
@@ -70,6 +69,7 @@ export function SessionIndex({ sessions }: { sessions: SessionWithEval[] }): Rea
                       month: 'short',
                       day: 'numeric',
                       year: 'numeric',
+                      timeZone: 'UTC',
                     })}
                   </td>
                   <td className="px-4 py-3">
@@ -84,7 +84,13 @@ export function SessionIndex({ sessions }: { sessions: SessionWithEval[] }): Rea
                   <td className="px-4 py-3">
                     {s.binaryChecks ? (
                       <BinaryDots
-                        results={Object.values(s.binaryChecks) as BinaryResult[]}
+                        results={[
+                          s.binaryChecks.dtsa,
+                          s.binaryChecks.ca1660,
+                          s.binaryChecks.tradeSecret,
+                          s.binaryChecks.aiTraining,
+                          s.binaryChecks.consistency,
+                        ]}
                       />
                     ) : (
                       <span className="text-xs text-text-muted">—</span>

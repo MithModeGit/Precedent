@@ -73,9 +73,13 @@ const TIERS_BY_MODE: Record<string, string[]> = {
 }
 
 const model = google(GEMINI_MODEL_ID)
+// Prefer the service-role key for this admin seed when present (bypasses RLS); fall
+// back to the publishable key, which works under the current no-RLS MVP posture.
 const supabase = createClient<Database>(
   process.env.NEXT_PUBLIC_SUPABASE_URL as string,
-  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY as string,
+  (process.env.SUPABASE_SECRET_KEY ??
+    process.env.SUPABASE_SERVICE_ROLE_KEY ??
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY) as string,
 )
 
 function loadNda(file: string): string {
@@ -131,9 +135,10 @@ async function seedOne(b: Benchmark): Promise<void> {
   const redlines = redlineOut.redlines.filter((r) => allowed.includes(r.priority))
 
   // Replace any prior data for this benchmark id (cascades clause_reviews + eval rows).
-  await supabase.from('sessions').delete().eq('id', b.id)
+  const { error: deleteError } = await supabase.from('sessions').delete().eq('id', b.id)
+  if (deleteError) throw new Error(`Failed to delete benchmark session: ${deleteError.message}`)
 
-  await supabase.from('sessions').insert({
+  const { error: sessionError } = await supabase.from('sessions').insert({
     id: b.id,
     device_id: BENCHMARK_DEVICE,
     created_at: createdAt,
@@ -148,6 +153,7 @@ async function seedOne(b: Benchmark): Promise<void> {
     export_generated_at: createdAt,
     is_benchmark: true,
   })
+  if (sessionError) throw new Error(`Failed to insert benchmark session: ${sessionError.message}`)
 
   const orderBySection = new Map<string, number>()
   classification.clauses.forEach((c, i) => {
@@ -171,10 +177,11 @@ async function seedOne(b: Benchmark): Promise<void> {
     decided_at: createdAt,
     display_order: orderBySection.get(normalize(r.originalText)) ?? i,
   }))
-  const { data: insertedClauses } = await supabase
+  const { data: insertedClauses, error: clauseError } = await supabase
     .from('clause_reviews')
     .insert(clauseRows)
     .select('id, clause_type, section_number')
+  if (clauseError) throw new Error(`Failed to insert clause reviews: ${clauseError.message}`)
 
   // Pass 3
   const { object: evalOut } = await generateObject({

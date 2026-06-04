@@ -106,7 +106,11 @@ export function TrendOverview({
       current
         .filter((s) => s.overallScore !== null)
         .map((s) => ({
-          date: new Date(s.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+          date: new Date(s.createdAt).toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            timeZone: 'UTC',
+          }),
           overallScore: s.overallScore as number,
           documentName: s.documentName,
           documentType: s.documentType,
@@ -191,9 +195,9 @@ export function TrendOverview({
           </p>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             {CHECKS.map((c) => {
-              const withEval = current.filter((s) => s.binaryChecks)
-              const passes = withEval.filter((s) => s.binaryChecks![c.key] === 'PASS').length
-              const rate = withEval.length ? passes / withEval.length : null
+              const sessionsWithChecks = current.filter((s) => s.binaryChecks)
+              const passes = sessionsWithChecks.filter((s) => s.binaryChecks![c.key] === 'PASS').length
+              const rate = sessionsWithChecks.length ? passes / sessionsWithChecks.length : null
               const pct = rate != null ? Math.round(rate * 100) : null
               const color =
                 pct == null

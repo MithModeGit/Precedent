@@ -52,13 +52,27 @@ export interface DashboardData {
 export async function getDashboardData(): Promise<DashboardData> {
   const supabase = getSupabaseServer()
 
-  const [{ data: sessions }, { data: evalRuns }, { data: reviews }, { data: clauseScores }] =
-    await Promise.all([
-      supabase.from('sessions').select('*').order('created_at', { ascending: true }),
-      supabase.from('eval_runs').select('*'),
-      supabase.from('clause_reviews').select('id, session_id, clause_type, decision'),
-      supabase.from('eval_clause_scores').select('clause_review_id, clause_overall_score'),
-    ])
+  const [
+    { data: sessions, error: sessionsError },
+    { data: evalRuns, error: evalRunsError },
+    { data: reviews, error: reviewsError },
+    { data: clauseScores, error: clauseScoresError },
+  ] = await Promise.all([
+    supabase.from('sessions').select('*').order('created_at', { ascending: true }),
+    supabase.from('eval_runs').select('*'),
+    supabase.from('clause_reviews').select('id, session_id, clause_type, decision'),
+    supabase.from('eval_clause_scores').select('clause_review_id, clause_overall_score'),
+  ])
+
+  if (sessionsError || evalRunsError || reviewsError || clauseScoresError) {
+    console.error('Error fetching dashboard data', {
+      sessionsError,
+      evalRunsError,
+      reviewsError,
+      clauseScoresError,
+    })
+    throw new Error('Failed to fetch dashboard data.')
+  }
 
   const evalBySession = new Map((evalRuns ?? []).map((e) => [e.session_id, e]))
 
