@@ -66,6 +66,7 @@ export function TrendOverview({
   scoreDistribution: Record<number, number>
 }): React.ReactElement {
   const metrics = useMemo(() => computeMetrics(sessions), [sessions])
+  const sessionsWithChecks = useMemo(() => sessions.filter((s) => s.binaryChecks), [sessions])
 
   const trendData: TrendPoint[] = useMemo(
     () =>
@@ -173,7 +174,6 @@ export function TrendOverview({
           </p>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             {CHECKS.map((c) => {
-              const sessionsWithChecks = sessions.filter((s) => s.binaryChecks)
               const passes = sessionsWithChecks.filter((s) => s.binaryChecks![c.key] === 'PASS').length
               const rate = sessionsWithChecks.length ? passes / sessionsWithChecks.length : null
               const pct = rate != null ? Math.round(rate * 100) : null

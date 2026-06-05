@@ -30,6 +30,14 @@ export function extractJsonObject(text: string): unknown {
   }
 }
 
+// Reuse a single Gemini client across passes rather than recreating it per call. Created
+// lazily so the server-only API key is read on first use, not at module load.
+let genAIClient: GoogleGenAI | null = null
+function getGenAI(): GoogleGenAI {
+  if (!genAIClient) genAIClient = new GoogleGenAI({ apiKey: serverEnv.googleApiKey })
+  return genAIClient
+}
+
 export type PipelinePass = 1 | 2 | 3 | 4
 
 /** Error carrying which pipeline pass failed, for structured API error responses. */
@@ -59,7 +67,7 @@ interface GenerateStructuredOptions<T> {
  * Retries on a transient or unparseable result, then throws a PipelineError.
  */
 export async function generateStructured<T>(opts: GenerateStructuredOptions<T>): Promise<T> {
-  const ai = new GoogleGenAI({ apiKey: serverEnv.googleApiKey })
+  const ai = getGenAI()
   const schemaJson = JSON.stringify(zodToJsonSchema(opts.schema, { $refStrategy: 'none' }), null, 2)
   const prompt = `${opts.prompt}\n\nReturn ONLY a single JSON object (no markdown fences, no commentary) that conforms exactly to this JSON Schema:\n${schemaJson}`
 
