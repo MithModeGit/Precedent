@@ -220,8 +220,11 @@ export function TrendOverview({
                   <span className="h-3 flex-1 rounded-full bg-surface-raised">
                     <span className="block h-3 rounded-full bg-navy" style={{ width: `${pct}%` }} />
                   </span>
-                  <span className="w-16 shrink-0 text-right font-mono text-xs text-text-secondary">
-                    {n} ({pct}%)
+                  <span className="w-10 shrink-0 text-left font-mono text-xs text-text-secondary">
+                    {n}
+                  </span>
+                  <span className="w-12 shrink-0 text-left font-mono text-xs text-text-muted">
+                    {pct}%
                   </span>
                 </div>
               )
