@@ -25,6 +25,7 @@ import {
   getConfidenceSignal,
   clauseHasFailedBinaryCheck,
 } from '../lib/eval-scoring'
+import { pairScoreReviewIds } from '../lib/eval-pairing'
 
 const BENCHMARK_DEVICE = '00000000-0000-4000-8000-0000000000aa'
 const DAY = 24 * 60 * 60 * 1000
@@ -248,12 +249,12 @@ async function seedOne(b: Benchmark): Promise<void> {
   const evalRunId = runRows?.[0]?.id
   if (!evalRunId) throw new Error('Failed to insert eval run')
 
-  // The evaluator scores redlines in the order it was given them, which is the order the
-  // clause reviews were inserted, so pair by position rather than by a fragile key.
-  const insertedIds = (insertedClauses ?? []).map((c) => c.id)
+  // Pair per-clause scores to the inserted reviews with the hybrid (key, then order)
+  // strategy, robust to a format drift or a skipped clause.
+  const reviewIdForScore = pairScoreReviewIds(evalOut.clauseScores, insertedClauses ?? [])
   const clauseScoreRows = evalOut.clauseScores
     .map((cs, i) => {
-      const clauseReviewId = insertedIds[i]
+      const clauseReviewId = reviewIdForScore[i]
       if (!clauseReviewId) return null
       const clauseOverall = round2(weightedDimensionScore(cs.dimensions))
       return {

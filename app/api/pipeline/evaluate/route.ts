@@ -4,6 +4,7 @@ import { getSupabaseServer } from '@/lib/supabase'
 import { getReferenceDatabase } from '@/lib/reference-database'
 import { buildEvaluateSystemPrompt } from '@/prompts/evaluate'
 import { getStoredEval } from '@/lib/eval-fetch'
+import { pairScoreReviewIds } from '@/lib/eval-pairing'
 import { EvaluateOutputSchema, type EvaluateOutput } from '@/schemas/evaluate'
 import {
   calculateOverallScore,
@@ -40,15 +41,15 @@ function applyServerScores(output: EvaluateOutput): EvaluateOutput {
 async function persist(sessionId: string, scored: EvaluateOutput): Promise<void> {
   const supabase = getSupabaseServer()
 
-  // The model returns clause scores in the same order as the redlines it was given, so
-  // pair them by position (display order). This is robust to the model echoing clause
-  // types or section numbers in a slightly different format than what we stored.
+  // Pair the model's per-clause scores to the clause reviews with a hybrid strategy
+  // (key match first, then positional fallback) so neither a format drift nor a skipped
+  // clause silently corrupts the pairings.
   const { data: reviews } = await supabase
     .from('clause_reviews')
-    .select('id')
+    .select('id, clause_type, section_number')
     .eq('session_id', sessionId)
     .order('display_order', { ascending: true })
-  const reviewIds = (reviews ?? []).map((r) => r.id)
+  const reviewIdForScore = pairScoreReviewIds(scored.clauseScores, reviews ?? [])
 
   const b = scored.binaryChecks
   // One eval run per session. Insert the new run first, then prune older runs (cascade
@@ -97,7 +98,7 @@ async function persist(sessionId: string, scored: EvaluateOutput): Promise<void>
 
   const clauseRows = scored.clauseScores
     .map((cs, i) => {
-      const clauseReviewId = reviewIds[i]
+      const clauseReviewId = reviewIdForScore[i]
       if (!clauseReviewId) return null
       return {
         eval_run_id: evalRunId,
