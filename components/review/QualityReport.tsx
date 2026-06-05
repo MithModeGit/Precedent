@@ -4,6 +4,7 @@ import type { EvaluateOutput } from '@/schemas/evaluate'
 import { useSession } from '@/components/review/SessionContext'
 import { Tooltip } from '@/components/ui/Tooltip'
 import { DimensionAccordion } from '@/components/eval/DimensionAccordion'
+import { CoverageSection } from '@/components/eval/CoverageSection'
 
 const CHECKS: { key: keyof EvaluateOutput['binaryChecks']; label: string; info: string }[] = [
   {
@@ -58,6 +59,18 @@ export function QualityReport(): React.ReactElement {
           dimension to see what it measures and why it scored as it did.
         </p>
       </div>
+
+      {evalResults.issueCoverage && (
+        <div>
+          <p className="mb-3 text-sm font-semibold uppercase tracking-widest text-text-secondary">
+            Coverage
+          </p>
+          <CoverageSection
+            dimensions={evalResults.dimensions}
+            issueCoverage={evalResults.issueCoverage}
+          />
+        </div>
+      )}
 
       <div>
         <p className="mb-2 text-sm font-semibold uppercase tracking-widest text-text-secondary">
