@@ -1,15 +1,15 @@
 interface ScoreKey {
   clauseType: string
-  sectionNumber: string
+  sectionNumber: string | null | undefined
 }
 
 interface ReviewKey {
   id: string
   clause_type: string
-  section_number: string
+  section_number: string | null | undefined
 }
 
-function normalizeKey(clauseType: string, sectionNumber: string): string {
+function normalizeKey(clauseType: string, sectionNumber: string | null | undefined): string {
   return `${clauseType}|${(sectionNumber ?? '').trim().toLowerCase().replace(/\s+/g, ' ')}`
 }
 
