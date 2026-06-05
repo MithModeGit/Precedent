@@ -10,14 +10,16 @@ import { GEMINI_MODEL_ID, CLAUDE_JUDGE_MODEL_ID, serverEnv } from '@/lib/env'
 const JUDGE_THINKING_BUDGET = 24000
 const JUDGE_MAX_TOKENS = 64000
 
-/** Extracts the outermost JSON object from model text, tolerating markdown fences or prose. */
+/**
+ * Extracts the JSON object from model text by taking the span from the first opening brace
+ * to the last closing brace. This is robust to markdown fences (which contain no braces) and
+ * to multiple code blocks, unlike matching the first fenced block.
+ */
 export function extractJsonObject(text: string): unknown {
-  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i)
-  const raw = fenced && fenced[1] ? fenced[1] : text
-  const start = raw.indexOf('{')
-  const end = raw.lastIndexOf('}')
+  const start = text.indexOf('{')
+  const end = text.lastIndexOf('}')
   if (start === -1 || end === -1) throw new Error('No JSON object found in evaluator output')
-  return JSON.parse(raw.slice(start, end + 1))
+  return JSON.parse(text.slice(start, end + 1))
 }
 
 export type PipelinePass = 1 | 2 | 3 | 4

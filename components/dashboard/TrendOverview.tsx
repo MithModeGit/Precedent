@@ -110,7 +110,7 @@ export function TrendOverview({
         .map((s) => {
           // X-axis is keyed on the document, not the date, so the trend still reads when
           // several benchmarks share a date. The hover tooltip shows the full name.
-          const base = s.documentName.replace(/\.docx$/i, '').replace(/\s*NDA$/i, '').trim()
+          const base = (s.documentName ?? '').replace(/\.docx$/i, '').replace(/\s*NDA$/i, '').trim()
           return {
             date: new Date(s.createdAt).toLocaleDateString('en-US', {
               month: 'short',

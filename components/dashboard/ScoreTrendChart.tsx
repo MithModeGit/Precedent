@@ -33,7 +33,6 @@ export function ScoreTrendChart({ data }: { data: TrendPoint[] }): React.ReactEl
         <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
         <XAxis
           dataKey="label"
-          interval={0}
           tick={{ fontFamily: 'var(--font-dm-sans)', fontSize: 11, fill: 'var(--color-text-secondary)' }}
         />
         <YAxis
