@@ -10,12 +10,6 @@ import { GEMINI_MODEL_ID, CLAUDE_JUDGE_MODEL_ID, serverEnv } from '@/lib/env'
 const JUDGE_THINKING_BUDGET = 24000
 const JUDGE_MAX_TOKENS = 64000
 
-/**
- * Bounded thinking budget for the Gemini generator passes. Deep enough for thorough,
- * comprehensive redline review, but capped so dynamic reasoning does not consume the output
- * token budget and truncate the structured JSON.
- */
-export const GEMINI_THINKING_BUDGET = 24576
 
 /**
  * Extracts the JSON object from model text by taking the span from the first opening brace
@@ -67,28 +61,29 @@ export async function generateStructured<T>(opts: GenerateStructuredOptions<T>):
   const google = createGoogleGenerativeAI({ apiKey: serverEnv.googleApiKey })
   const model = google(GEMINI_MODEL_ID)
 
-  for (let attempt = 1; attempt <= 2; attempt++) {
+  // Thinking strategy for Gemini 3 Flash: its default is high *dynamic* thinking, which gives
+  // the most thorough review but is uncontrollable here. The model ignores an explicit
+  // thinking_budget cap (the installed SDK cannot send Gemini 3's thinking_level), so on some
+  // documents dynamic thinking consumes nearly the whole 64k output budget and truncates the
+  // JSON (finishReason "length"). Strategy: attempt 1 uses full thinking (best quality where it
+  // fits); if it fails, fall back to thinking disabled (thinking_budget 0 IS honored), which
+  // guarantees the full structured output. Robust everywhere, deep reasoning where it fits.
+  // Temperature is left at the Gemini 3 default of 1.0 (lowering it degrades quality).
+  for (let attempt = 1; attempt <= 3; attempt++) {
     try {
       const { object } = await generateObject({
         model,
         schema: opts.schema,
         system: opts.system,
         prompt: opts.prompt,
-        // Max output (64k for Gemini 3 Flash).
         maxTokens: 65536,
-        // Substantial-but-BOUNDED thinking. Leaving thinking unbounded (the Flash default)
-        // lets dynamic reasoning consume nearly the whole output budget and truncate the JSON
-        // (finishReason "length"); disabling it (budget 0) was what made redlines shallow.
-        // A bounded budget gives deep reasoning while leaving ample room for the structured
-        // output. The SDK only exposes thinking_budget, not Gemini 3's thinking_level.
-        // Temperature is left at the Gemini 3 default of 1.0 (lowering it degrades quality).
-        providerOptions: {
-          google: { thinkingConfig: { thinkingBudget: GEMINI_THINKING_BUDGET } },
-        },
+        ...(attempt === 1
+          ? {}
+          : { providerOptions: { google: { thinkingConfig: { thinkingBudget: 0 } } } }),
       })
       return object
     } catch (error) {
-      if (attempt === 2) {
+      if (attempt === 3) {
         throw new PipelineError(opts.pass, error)
       }
       // Brief backoff so transient rate limits (429) or overload (503) can clear.
