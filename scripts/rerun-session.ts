@@ -203,7 +203,8 @@ async function main(): Promise<void> {
     })
     .filter((r): r is NonNullable<typeof r> => r !== null)
   if (clauseScoreRows.length > 0) {
-    await supabase.from('eval_clause_scores').insert(clauseScoreRows)
+    const { error: scoreError } = await supabase.from('eval_clause_scores').insert(clauseScoreRows)
+    if (scoreError) throw new Error(`Failed to insert clause scores: ${scoreError.message}`)
   }
 
   console.warn(
