@@ -30,6 +30,7 @@ export interface SessionWithEval {
   mode: ReviewMode
   createdAt: string
   isBenchmark: boolean
+  benchmarkKind: 'standard' | 'adversarial'
   status: SessionStatus
   overallScore: number | null
   dimensions: SessionDimensions | null
@@ -103,6 +104,7 @@ export async function getDashboardData(): Promise<DashboardData> {
       mode: s.mode,
       createdAt: s.created_at,
       isBenchmark: s.is_benchmark,
+      benchmarkKind: s.benchmark_kind,
       status: s.status,
       overallScore: run ? Number(run.overall_score) : null,
       dimensions: run

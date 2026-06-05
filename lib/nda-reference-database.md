@@ -269,6 +269,48 @@ FUNCTION: Restricts the Parties from soliciting each other's employees during an
 
 ---
 
+### Clause 13: Health Data and HIPAA Business Associate Agreement
+
+FUNCTION: Governs disclosures of protected health information (PHI) when a HIPAA covered entity (such as a health system, provider, or health plan) shares identifiable patient data with a vendor or partner.
+
+TRIGGER: The subject matter involves PHI, identifiable patient data, or any disclosure by a healthcare entity to a recipient that will create, receive, maintain, or transmit PHI on its behalf.
+
+**Must-Address:** An NDA alone does not satisfy HIPAA. When a covered entity discloses PHI to a business associate, the parties must execute a HIPAA-compliant Business Associate Agreement (BAA), and the NDA should require it as a condition of disclosure and require the recipient to comply with the HIPAA Privacy and Security Rules. A missing BAA requirement is a material compliance gap, not a stylistic one. Recommend the redline reference the BAA requirement and recommend privacy counsel review; do not draft the full BAA inside the NDA. [Source: 45 C.F.R. §§ 164.502(e), 164.504(e) (business associate contract requirements); 45 C.F.R. §§ 164.308, 164.314 (administrative safeguards and organizational requirements)]
+
+**Should-Address:** Add an express statement that PHI may be used and disclosed only as permitted by the BAA and applicable law, and that the recipient will report any breach of unsecured PHI without unreasonable delay.
+
+---
+
+### Clause 14: Cross-Border Data Protection
+
+FUNCTION: Governs transfers of personal data subject to the EU General Data Protection Regulation (EU GDPR) or the UK GDPR, including transfers outside the EEA or the UK.
+
+TRIGGER: The document involves personal data of EU/EEA or UK individuals, or a transfer of personal data outside the EEA or the United Kingdom.
+
+**Must-Address:** A generic promise to "implement appropriate Standard Contractual Clauses" is insufficient. The clause should identify the specific transfer mechanism: the EU Commission's 2021 Standard Contractual Clauses (Implementing Decision (EU) 2021/914) and the applicable module (for example, controller-to-processor), and for UK transfers the UK International Data Transfer Agreement or Addendum. Following Schrems II, a transfer impact assessment is also expected. Flag vague or unspecified SCC references. [Source: EU GDPR Art. 46; Implementing Decision (EU) 2021/914 (2021 SCCs); Case C-311/18, Data Protection Commissioner v. Facebook Ireland and Schrems (CJEU 2020)]
+
+**Should-Address:** Recommend a separate Data Processing Addendum (DPA) for any sustained processing relationship rather than embedding data-protection terms in the NDA, and recommend privacy counsel review. This is outside the standard NDA playbook; do not fabricate authority beyond the sources above.
+
+---
+
+### Clause 15: Pre-Existing and Independently Developed IP
+
+FUNCTION: Protects each party's background intellectual property where an NDA contains (often inadvisably) an intellectual-property assignment, work-product, or "work made for hire" clause.
+
+TRIGGER: The document contains an IP assignment, work-product, or work-made-for-hire provision (atypical in a pure NDA, common when an NDA is overloaded with services terms).
+
+**Must-Address:** Add a carve-out excluding from any assignment the assigning party's pre-existing intellectual property and any IP independently developed without use of or reference to the Confidential Information. Without it, an individual or vendor may inadvertently assign background code, libraries, tools, or methodologies. Consider recommending the assignment be moved to a separate services or consulting agreement. [Source: market practice; consistent with the independent-development principle in Clause 2 carve-out (d)]
+
+---
+
+### Clause 16: Defined-Terms and Reference Integrity
+
+FUNCTION: Ensures the agreement is internally complete and enforceable.
+
+**Must-Address:** Every operative capitalized term that is used in the obligations (for example "Effective Date", "Representatives", "Affiliates", "Purpose", "Permitted Purpose") must be defined. An undefined operative term, an undefined "Effective Date" that anchors term or survival periods, or a reference to a non-existent Exhibit, Schedule, or Section is a material drafting defect that undermines enforceability. Flag each and propose a definition or correction. [Source: market practice; basic contract-construction principles]
+
+---
+
 ## PART 3: Key Case Summaries
 
 ### Martin Marietta Materials, Inc. v. Vulcan Materials Co., 56 A.3d 1072 (Del. 2012)

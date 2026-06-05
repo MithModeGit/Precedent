@@ -26,7 +26,7 @@ import {
   clauseHasFailedBinaryCheck,
 } from '../lib/eval-scoring'
 import { pairScoreReviewIds } from '../lib/eval-pairing'
-import { generateJudged } from '../lib/pipeline'
+import { generateJudged, GEMINI_THINKING_BUDGET } from '../lib/pipeline'
 
 const BENCHMARK_DEVICE = '00000000-0000-4000-8000-0000000000aa'
 const round2 = (n: number): number => Math.round(n * 100) / 100
@@ -38,6 +38,7 @@ interface Benchmark {
   perspective: 'disclosing' | 'receiving'
   mode: 'conservative' | 'standard' | 'aggressive'
   createdAt: string
+  kind: 'standard' | 'adversarial'
 }
 
 // All benchmarks were produced over two days of work. Fixed dates (rather than relative
@@ -51,6 +52,7 @@ const BENCHMARKS: Benchmark[] = [
     perspective: 'receiving',
     mode: 'standard',
     createdAt: '2026-06-03T15:00:00Z',
+    kind: 'standard',
   },
   {
     id: '00000000-0000-4000-8000-000000000002',
@@ -59,6 +61,7 @@ const BENCHMARKS: Benchmark[] = [
     perspective: 'receiving',
     mode: 'standard',
     createdAt: '2026-06-03T18:00:00Z',
+    kind: 'standard',
   },
   {
     id: '00000000-0000-4000-8000-000000000003',
@@ -67,6 +70,7 @@ const BENCHMARKS: Benchmark[] = [
     perspective: 'receiving',
     mode: 'standard',
     createdAt: '2026-06-03T21:00:00Z',
+    kind: 'standard',
   },
   {
     // Deliberately hard / adversarial document to test that the evaluator discriminates.
@@ -76,6 +80,7 @@ const BENCHMARKS: Benchmark[] = [
     perspective: 'receiving',
     mode: 'standard',
     createdAt: '2026-06-04T16:00:00Z',
+    kind: 'adversarial',
   },
 ]
 
@@ -117,21 +122,21 @@ async function seedOne(b: Benchmark): Promise<void> {
   )
   const createdAt = b.createdAt
 
-  // Pass 1
+  // Pass 1. Bounded high thinking, matching the live route (lib/pipeline generateStructured).
   const { object: classification } = await generateObject({
     model,
-    maxTokens: 60000,
-    providerOptions: { google: { thinkingConfig: { thinkingBudget: 0 } } },
+    maxTokens: 65536,
+    providerOptions: { google: { thinkingConfig: { thinkingBudget: GEMINI_THINKING_BUDGET } } },
     schema: ClassifyOutputSchema,
     system: CLASSIFY_SYSTEM_PROMPT,
     prompt: text,
   })
 
-  // Pass 2
+  // Pass 2. Bounded high thinking, matching the live route.
   const { object: redlineOut } = await generateObject({
     model,
-    maxTokens: 60000,
-    providerOptions: { google: { thinkingConfig: { thinkingBudget: 0 } } },
+    maxTokens: 65536,
+    providerOptions: { google: { thinkingConfig: { thinkingBudget: GEMINI_THINKING_BUDGET } } },
     schema: RedlineOutputSchema,
     system: buildRedlineSystemPrompt({
       referenceDatabase,
@@ -169,6 +174,7 @@ async function seedOne(b: Benchmark): Promise<void> {
     status: 'exported',
     export_generated_at: createdAt,
     is_benchmark: true,
+    benchmark_kind: b.kind,
     document_text: documentText,
   })
   if (sessionError) throw new Error(`Failed to insert benchmark session: ${sessionError.message}`)
