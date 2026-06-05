@@ -148,6 +148,11 @@ export async function GET(request: NextRequest): Promise<Response> {
           .eq('id', sessionId)
           .single()
 
+        if (!session) {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: 'Session not found' })}\n\n`))
+          return
+        }
+
         const { data: reviews } = await supabase
           .from('clause_reviews')
           .select(

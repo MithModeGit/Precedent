@@ -45,8 +45,9 @@ export function failedCheckCount(binaryChecks: BinaryChecks): number {
  * (x-1)/4, combined with F-beta, then mapped back to 1-5.
  */
 export function fBetaScore(precision: number, coverage: number, beta = RECALL_BETA): number {
-  const p = (precision - 1) / 4
-  const r = (coverage - 1) / 4
+  const clamp01 = (x: number): number => Math.min(1, Math.max(0, x))
+  const p = clamp01((precision - 1) / 4)
+  const r = clamp01((coverage - 1) / 4)
   const b2 = beta * beta
   const denom = b2 * p + r
   const f = denom <= 0 ? 0 : ((1 + b2) * p * r) / denom
