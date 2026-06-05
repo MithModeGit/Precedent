@@ -11,8 +11,9 @@ export function CoverageSection({
   issueCoverage,
 }: {
   dimensions: EvaluateOutput['dimensions']
-  issueCoverage: EvaluateOutput['issueCoverage']
+  issueCoverage?: EvaluateOutput['issueCoverage']
 }): React.ReactElement {
+  if (!issueCoverage) return <></>
   const precision = weightedDimensionScore(dimensions)
   const missed = issueCoverage.missedIssues ?? []
   return (
@@ -41,7 +42,7 @@ export function CoverageSection({
             {missed.map((issue, i) => (
               <li
                 key={i}
-                className="border-l-2 border-must-border pl-3 text-sm leading-6 text-text-secondary"
+                className="border-l-2 border-must pl-3 text-sm leading-6 text-text-secondary"
               >
                 {issue}
               </li>

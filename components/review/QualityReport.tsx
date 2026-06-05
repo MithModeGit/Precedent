@@ -60,15 +60,17 @@ export function QualityReport(): React.ReactElement {
         </p>
       </div>
 
-      <div>
-        <p className="mb-3 text-sm font-semibold uppercase tracking-widest text-text-secondary">
-          Coverage
-        </p>
-        <CoverageSection
-          dimensions={evalResults.dimensions}
-          issueCoverage={evalResults.issueCoverage}
-        />
-      </div>
+      {evalResults.issueCoverage && (
+        <div>
+          <p className="mb-3 text-sm font-semibold uppercase tracking-widest text-text-secondary">
+            Coverage
+          </p>
+          <CoverageSection
+            dimensions={evalResults.dimensions}
+            issueCoverage={evalResults.issueCoverage}
+          />
+        </div>
+      )}
 
       <div>
         <p className="mb-2 text-sm font-semibold uppercase tracking-widest text-text-secondary">
