@@ -119,8 +119,8 @@ export function TrendOverview({
             }),
             label: base.length > 20 ? `${base.slice(0, 19)}…` : base,
             overallScore: s.overallScore as number,
-            documentName: s.documentName,
-            documentType: s.documentType,
+            documentName: s.documentName ?? '',
+            documentType: s.documentType ?? '',
           }
         }),
     [current],
