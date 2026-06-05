@@ -44,11 +44,17 @@ async function persist(sessionId: string, scored: EvaluateOutput): Promise<void>
   // Pair the model's per-clause scores to the clause reviews with a hybrid strategy
   // (key match first, then positional fallback) so neither a format drift nor a skipped
   // clause silently corrupts the pairings.
-  const { data: reviews } = await supabase
+  const { data: reviews, error: reviewsError } = await supabase
     .from('clause_reviews')
     .select('id, clause_type, section_number')
     .eq('session_id', sessionId)
     .order('display_order', { ascending: true })
+  if (reviewsError) {
+    // Abort the write entirely: pairing clause scores would be impossible, and persisting
+    // would prune the existing valid run and save an incomplete one.
+    console.error(`Failed to fetch clause reviews for scoring; skipping persist: ${reviewsError.message}`)
+    return
+  }
   const reviewIdForScore = pairScoreReviewIds(scored.clauseScores, reviews ?? [])
 
   const b = scored.binaryChecks
@@ -153,7 +159,7 @@ export async function GET(request: NextRequest): Promise<Response> {
           return
         }
 
-        const { data: reviews } = await supabase
+        const { data: reviews, error: reviewsError } = await supabase
           .from('clause_reviews')
           .select(
             'clause_type, section_number, priority_tier, original_text, proposed_text, rationale, citation, counterparty_prediction',
@@ -161,6 +167,11 @@ export async function GET(request: NextRequest): Promise<Response> {
           .eq('session_id', sessionId)
           .order('display_order', { ascending: true })
 
+        if (reviewsError) {
+          console.error(`Failed to load redlines to evaluate: ${reviewsError.message}`)
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: 'Could not load redlines' })}\n\n`))
+          return
+        }
         if (!reviews || reviews.length === 0) {
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: 'No redlines to evaluate' })}\n\n`))
           return
