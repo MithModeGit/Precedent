@@ -16,10 +16,17 @@ const JUDGE_MAX_TOKENS = 64000
  * to multiple code blocks, unlike matching the first fenced block.
  */
 export function extractJsonObject(text: string): unknown {
-  const start = text.indexOf('{')
-  const end = text.lastIndexOf('}')
-  if (start === -1 || end === -1) throw new Error('No JSON object found in evaluator output')
-  return JSON.parse(text.slice(start, end + 1))
+  const trimmed = text.trim()
+  // The prompt asks for only JSON, so the whole response usually parses directly. Fall back
+  // to the outermost-brace span only when the model wraps the object in fences or stray text.
+  try {
+    return JSON.parse(trimmed)
+  } catch {
+    const start = trimmed.indexOf('{')
+    const end = trimmed.lastIndexOf('}')
+    if (start === -1 || end <= start) throw new Error('No JSON object found in evaluator output')
+    return JSON.parse(trimmed.slice(start, end + 1))
+  }
 }
 
 export type PipelinePass = 1 | 2 | 3 | 4
