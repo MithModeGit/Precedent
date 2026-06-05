@@ -11,12 +11,13 @@ import { Document, Packer, Paragraph, TextRun, HeadingLevel } from 'docx'
 
 async function main(): Promise<void> {
   const srcRel = process.argv[2] ?? 'lib/synthetic-ndas/nda-4-hard.md'
-  // If no output path is given, derive it from the source (same path, .docx) when a source
-  // was provided; otherwise fall back to the adversarial benchmark's output.
+  // If no output path is given, derive it from the source by replacing its extension with
+  // .docx (so it is always distinct from the source, whatever its extension); with no source
+  // at all, fall back to the adversarial benchmark's output.
   const outRel =
     process.argv[3] ??
     (process.argv[2]
-      ? srcRel.replace(/\.md$/i, '.docx')
+      ? `${srcRel.replace(/\.[^.]*$/, '')}.docx`
       : 'samples/Cross-Border-Data-Partnership-NDA.docx')
 
   const source = readFileSync(join(process.cwd(), srcRel), 'utf-8')
