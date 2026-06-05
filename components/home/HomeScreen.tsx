@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import type { SessionRow, EvalRunRow } from '@/types'
 import { Button } from '@/components/ui/Button'
 import { ScoreBadge } from '@/components/dashboard/shared'
+import { AboutPrototype } from '@/components/home/AboutPrototype'
 import { getSupabaseBrowser } from '@/lib/supabase'
 import { getOrCreateDeviceId } from '@/lib/session'
 
@@ -209,6 +210,8 @@ export function HomeScreen(): React.ReactElement {
           </div>
         )}
       </section>
+
+      <AboutPrototype />
     </main>
   )
 }
