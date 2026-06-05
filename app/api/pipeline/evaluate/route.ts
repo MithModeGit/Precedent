@@ -49,7 +49,12 @@ async function persist(sessionId: string, scored: EvaluateOutput): Promise<void>
     .select('id, clause_type, section_number')
     .eq('session_id', sessionId)
     .order('display_order', { ascending: true })
-  if (reviewsError) console.error(`Failed to fetch clause reviews for scoring: ${reviewsError.message}`)
+  if (reviewsError) {
+    // Abort the write entirely: pairing clause scores would be impossible, and persisting
+    // would prune the existing valid run and save an incomplete one.
+    console.error(`Failed to fetch clause reviews for scoring; skipping persist: ${reviewsError.message}`)
+    return
+  }
   const reviewIdForScore = pairScoreReviewIds(scored.clauseScores, reviews ?? [])
 
   const b = scored.binaryChecks
