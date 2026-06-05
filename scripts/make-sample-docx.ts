@@ -12,9 +12,8 @@ async function main(): Promise<void> {
   const source = readFileSync(join(process.cwd(), 'lib/synthetic-ndas/nda-4-hard.md'), 'utf-8')
   const lines = source
     .split('\n')
-    .filter((l) => !l.startsWith('#'))
     .map((l) => l.trim())
-    .filter(Boolean)
+    .filter((l) => l && !l.startsWith('#'))
 
   if (lines.length === 0) {
     throw new Error('Source markdown produced no content lines; nothing to write.')
