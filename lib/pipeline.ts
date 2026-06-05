@@ -1,7 +1,26 @@
 import { createGoogleGenerativeAI } from '@ai-sdk/google'
-import { generateObject } from 'ai'
+import { createAnthropic } from '@ai-sdk/anthropic'
+import { generateObject, generateText } from 'ai'
+import { zodToJsonSchema } from 'zod-to-json-schema'
 import type { z } from 'zod'
-import { GEMINI_MODEL_ID, serverEnv } from '@/lib/env'
+import { GEMINI_MODEL_ID, CLAUDE_JUDGE_MODEL_ID, serverEnv } from '@/lib/env'
+
+// Extended-thinking budget for the judge. High enough for deliberate scoring of a full
+// document; the route sets a long maxDuration to accommodate the latency.
+const JUDGE_THINKING_BUDGET = 24000
+const JUDGE_MAX_TOKENS = 64000
+
+/**
+ * Extracts the JSON object from model text by taking the span from the first opening brace
+ * to the last closing brace. This is robust to markdown fences (which contain no braces) and
+ * to multiple code blocks, unlike matching the first fenced block.
+ */
+export function extractJsonObject(text: string): unknown {
+  const start = text.indexOf('{')
+  const end = text.lastIndexOf('}')
+  if (start === -1 || end === -1) throw new Error('No JSON object found in evaluator output')
+  return JSON.parse(text.slice(start, end + 1))
+}
 
 export type PipelinePass = 1 | 2 | 3 | 4
 
@@ -56,6 +75,41 @@ export async function generateStructured<T>(opts: GenerateStructuredOptions<T>):
         throw new PipelineError(opts.pass, error)
       }
       // Brief backoff so transient rate limits (429) or overload (503) can clear.
+      await new Promise((resolve) => setTimeout(resolve, 1500))
+    }
+  }
+
+  // Unreachable: the loop either returns or throws.
+  throw new PipelineError(opts.pass)
+}
+
+/**
+ * Runs a structured-output pass on Claude (the evaluation judge), a different model family
+ * than the Gemini generator, with extended thinking. Anthropic does not support JSON-mode
+ * object generation, and tool-mode object generation cannot run with thinking enabled, so
+ * this drives generateText, injects the JSON Schema, and parses the result. Retries once.
+ */
+export async function generateJudged<T>(opts: GenerateStructuredOptions<T>): Promise<T> {
+  const model = createAnthropic({ apiKey: serverEnv.anthropicApiKey })(CLAUDE_JUDGE_MODEL_ID)
+  const schemaJson = JSON.stringify(zodToJsonSchema(opts.schema, { $refStrategy: 'none' }), null, 2)
+  const prompt = `${opts.prompt}\n\nReturn ONLY a single JSON object (no markdown fences, no commentary) that conforms exactly to this JSON Schema:\n${schemaJson}`
+
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const { text } = await generateText({
+        model,
+        maxTokens: JUDGE_MAX_TOKENS,
+        providerOptions: {
+          anthropic: { thinking: { type: 'enabled', budgetTokens: JUDGE_THINKING_BUDGET } },
+        },
+        system: opts.system,
+        prompt,
+      })
+      return opts.schema.parse(extractJsonObject(text))
+    } catch (error) {
+      if (attempt === 2) {
+        throw new PipelineError(opts.pass, error)
+      }
       await new Promise((resolve) => setTimeout(resolve, 1500))
     }
   }

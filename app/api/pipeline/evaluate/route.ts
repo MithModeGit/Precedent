@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { generateStructured } from '@/lib/pipeline'
+import { generateJudged } from '@/lib/pipeline'
 import { getSupabaseServer } from '@/lib/supabase'
 import { getReferenceDatabase } from '@/lib/reference-database'
 import { buildEvaluateSystemPrompt } from '@/prompts/evaluate'
@@ -192,7 +192,9 @@ export async function GET(request: NextRequest): Promise<Response> {
           `Redlines that were made (evaluate their quality, and assess coverage against the full document above):\n${JSON.stringify(reviews, null, 2)}`,
         ].join('\n\n')
 
-        const output = await generateStructured({
+        // Judged by Claude (a different model family than the Gemini generator) so the
+        // evaluator is not grading work produced by its own model.
+        const output = await generateJudged({
           schema: EvaluateOutputSchema,
           system: buildEvaluateSystemPrompt(getReferenceDatabase()),
           prompt,

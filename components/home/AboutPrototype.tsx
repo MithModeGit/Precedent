@@ -32,7 +32,7 @@ export function AboutPrototype(): React.ReactElement {
       <p className="mt-3 max-w-prose text-sm leading-6 text-text-secondary">
         Precedent is a working demonstration of an AI NDA-review pipeline, assembled in about a day.
         It is not a production legal product; it is a focused prototype built to show how an AI legal
-        tool can be made transparent and self-critical about the quality of its own work.
+        tool can significantly accelerate the work of a lawyer.
       </p>
 
       <div className="mt-8">
@@ -57,7 +57,7 @@ export function AboutPrototype(): React.ReactElement {
             How it grades itself
           </p>
           <p className="mt-2 text-sm leading-6 text-text-secondary">
-            The evaluation reports two numbers, not one. Precision measures how good the redlines it
+            The evaluation reports two numbers. Precision measures how good the redlines it
             produced are; coverage (recall) measures how many of the material issues actually present
             in the document it caught. The overall score is a recall-weighted F-score of the two, so a
             polished review that misses a contradiction cannot score near the top.
@@ -70,8 +70,8 @@ export function AboutPrototype(): React.ReactElement {
           <p className="mt-2 text-sm leading-6 text-text-secondary">
             Scores come from a language model on a single, non-deterministic run, and the benchmarks
             are synthetic NDAs rather than attorney-labeled ground truth. To limit the risk of a model
-            grading its own work, the evaluation is moving to a different model family than the one that
-            writes the redlines. This tool does not provide legal advice.
+            grading its own work, the evaluation is conducted by a different model family than the one
+            that writes the redlines. This tool does not provide legal advice.
           </p>
         </div>
       </div>
