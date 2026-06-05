@@ -65,11 +65,14 @@ CALIBRATION (important): use the full 1-5 range and be critical, not generous. A
 
 EVIDENCE: every rationale and note must cite specific evidence: name the clause type and section number, the statute or source, or quote the exact wording you relied on. Do not write generic statements that could apply to any NDA.
 
+ISSUE COVERAGE (recall): You are given the FULL document under review, not only the redlines. The five dimensions above measure the quality of the redlines that were made (precision). Coverage measures something different and equally important: of the material issues actually present in the full document, how many did the redlines catch? Independently read the full document, enumerate the material issues, then check which the redlines addressed and which they missed. Pay specific attention to the issue classes a redline generator most often misses: internal contradictions between clauses (for example, a clause making trade-secret confidentiality survive indefinitely that conflicts with another clause capping or terminating all obligations after a fixed term), undefined or misused defined terms, broken or missing cross-references (to Sections, Exhibits, or Schedules that do not exist), and material obligations outside the standard NDA playbook such as cross-border data-protection / GDPR / Standard Contractual Clause requirements. A redline set can be excellent on the issues it addresses and still miss material issues; do not let high redline quality inflate the coverage score, and do not let missed issues lower the quality scores.
+
 Provide:
 - session-level dimension scores (an overall judgment across all redlines),
 - dimensionRationales: for each of the five dimensions, 2-3 sentences justifying the session-level score with the specific evidence above, including the biggest weakness for that dimension,
-- per-clause dimension scores (one entry per redline, identified by its clauseType and sectionNumber),
+- per-clause dimension scores: return EXACTLY ONE clauseScore object for EVERY redline you were given, in the SAME ORDER as the redlines, with none skipped, merged, or summarized. The clauseScores array length must equal the number of redlines. Identify each by its clauseType and sectionNumber, but order is what matters,
 - a per-clause evaluatorNote: a 2-3 sentence evidence-backed assessment of that redline (what it does well, its weakest dimension and why),
+- issueCoverage: a recall score (1-5) for how completely the redlines addressed the material issues present in the FULL document, a rationale citing what was caught and missed, and a missedIssues array naming each material issue the redlines did not address with its location. Score coverage independently of the five quality dimensions.
 - an improvementNotes array of specific, actionable observations about this session (what to fix in the redline engine, not praise).
 
 For overallScore and each clauseOverallScore, return your best estimate; the server recomputes these from the dimension scores.`

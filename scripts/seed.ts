@@ -25,6 +25,7 @@ import {
   getConfidenceSignal,
   clauseHasFailedBinaryCheck,
 } from '../lib/eval-scoring'
+import { pairScoreReviewIds } from '../lib/eval-pairing'
 
 const BENCHMARK_DEVICE = '00000000-0000-4000-8000-0000000000aa'
 const DAY = 24 * 60 * 60 * 1000
@@ -63,6 +64,15 @@ const BENCHMARKS: Benchmark[] = [
     perspective: 'receiving',
     mode: 'standard',
     daysAgo: 7,
+  },
+  {
+    // Deliberately hard / adversarial document to test that the evaluator discriminates.
+    id: '00000000-0000-4000-8000-000000000004',
+    file: 'nda-4-hard.md',
+    documentName: 'Cross-Border Data Partnership NDA.docx',
+    perspective: 'receiving',
+    mode: 'standard',
+    daysAgo: 2,
   },
 ]
 
@@ -138,6 +148,10 @@ async function seedOne(b: Benchmark): Promise<void> {
   const { error: deleteError } = await supabase.from('sessions').delete().eq('id', b.id)
   if (deleteError) throw new Error(`Failed to delete benchmark session: ${deleteError.message}`)
 
+  const documentText = classification.clauses
+    .map((c) => `[${c.clauseType} §${c.sectionNumber}] ${c.text}`)
+    .join('\n\n')
+
   const { error: sessionError } = await supabase.from('sessions').insert({
     id: b.id,
     device_id: BENCHMARK_DEVICE,
@@ -152,6 +166,7 @@ async function seedOne(b: Benchmark): Promise<void> {
     status: 'exported',
     export_generated_at: createdAt,
     is_benchmark: true,
+    document_text: documentText,
   })
   if (sessionError) throw new Error(`Failed to insert benchmark session: ${sessionError.message}`)
 
@@ -190,10 +205,18 @@ async function seedOne(b: Benchmark): Promise<void> {
     providerOptions: { google: { thinkingConfig: { thinkingBudget: 0 } } },
     schema: EvaluateOutputSchema,
     system: buildEvaluateSystemPrompt(referenceDatabase),
-    prompt: `Document classification:\n${JSON.stringify(classification, null, 2)}\n\nRedlines to evaluate:\n${JSON.stringify(redlines, null, 2)}`,
+    prompt: [
+      `Document classification:\n${JSON.stringify(classification, null, 2)}`,
+      `Full document under review (every clause, including those the redlines did not touch):\n${documentText}`,
+      `Redlines that were made (evaluate their quality, and assess coverage against the full document above):\n${JSON.stringify(redlines, null, 2)}`,
+    ].join('\n\n'),
   })
 
-  const overallScore = calculateOverallScore(evalOut.dimensions, evalOut.binaryChecks)
+  const overallScore = calculateOverallScore(
+    evalOut.dimensions,
+    evalOut.binaryChecks,
+    evalOut.issueCoverage.score,
+  )
   const b3 = evalOut.binaryChecks
   const { data: runRows } = await supabase
     .from('eval_runs')
@@ -218,17 +241,20 @@ async function seedOne(b: Benchmark): Promise<void> {
       consistency_note: b3.internalConsistency.note,
       improvement_notes: evalOut.improvementNotes,
       dimension_rationales: evalOut.dimensionRationales,
+      issue_coverage: evalOut.issueCoverage.score,
+      issue_coverage_rationale: evalOut.issueCoverage.rationale,
+      missed_issues: evalOut.issueCoverage.missedIssues,
     })
     .select('id')
   const evalRunId = runRows?.[0]?.id
   if (!evalRunId) throw new Error('Failed to insert eval run')
 
-  const idByKey = new Map(
-    (insertedClauses ?? []).map((c) => [`${c.clause_type}|${c.section_number}`, c.id]),
-  )
+  // Pair per-clause scores to the inserted reviews with the hybrid (key, then order)
+  // strategy, robust to a format drift or a skipped clause.
+  const reviewIdForScore = pairScoreReviewIds(evalOut.clauseScores, insertedClauses ?? [])
   const clauseScoreRows = evalOut.clauseScores
-    .map((cs) => {
-      const clauseReviewId = idByKey.get(`${cs.clauseType}|${cs.sectionNumber}`)
+    .map((cs, i) => {
+      const clauseReviewId = reviewIdForScore[i]
       if (!clauseReviewId) return null
       const clauseOverall = round2(weightedDimensionScore(cs.dimensions))
       return {
@@ -259,7 +285,13 @@ async function seedOne(b: Benchmark): Promise<void> {
 }
 
 async function main(): Promise<void> {
-  for (const b of BENCHMARKS) {
+  // Optional CLI filter: `npm run seed -- nda-4-hard.md` seeds only matching files/ids,
+  // leaving the other benchmarks untouched.
+  const filter = process.argv.slice(2)
+  const list = filter.length
+    ? BENCHMARKS.filter((b) => filter.includes(b.file) || filter.includes(b.id))
+    : BENCHMARKS
+  for (const b of list) {
     await seedOne(b)
   }
   console.warn('\nBenchmark seeding complete.')

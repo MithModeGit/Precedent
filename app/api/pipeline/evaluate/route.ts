@@ -4,6 +4,7 @@ import { getSupabaseServer } from '@/lib/supabase'
 import { getReferenceDatabase } from '@/lib/reference-database'
 import { buildEvaluateSystemPrompt } from '@/prompts/evaluate'
 import { getStoredEval } from '@/lib/eval-fetch'
+import { pairScoreReviewIds } from '@/lib/eval-pairing'
 import { EvaluateOutputSchema, type EvaluateOutput } from '@/schemas/evaluate'
 import {
   calculateOverallScore,
@@ -20,7 +21,11 @@ const round2 = (n: number): number => Math.round(n * 100) / 100
 
 /** Builds the SSE payload, applying server-computed overall scores and confidence signals. */
 function applyServerScores(output: EvaluateOutput): EvaluateOutput {
-  const overallScore = calculateOverallScore(output.dimensions, output.binaryChecks)
+  const overallScore = calculateOverallScore(
+    output.dimensions,
+    output.binaryChecks,
+    output.issueCoverage.score,
+  )
   const clauseScores = output.clauseScores.map((cs) => {
     const clauseOverallScore = round2(weightedDimensionScore(cs.dimensions))
     const failed = clauseHasFailedBinaryCheck(cs.clauseType, output.binaryChecks)
@@ -36,16 +41,21 @@ function applyServerScores(output: EvaluateOutput): EvaluateOutput {
 async function persist(sessionId: string, scored: EvaluateOutput): Promise<void> {
   const supabase = getSupabaseServer()
 
-  const { data: reviews } = await supabase
+  // Pair the model's per-clause scores to the clause reviews with a hybrid strategy
+  // (key match first, then positional fallback) so neither a format drift nor a skipped
+  // clause silently corrupts the pairings.
+  const { data: reviews, error: reviewsError } = await supabase
     .from('clause_reviews')
     .select('id, clause_type, section_number')
     .eq('session_id', sessionId)
-  // Normalize the match key so trivial whitespace/case differences in the section number
-  // (model-echoed vs stored) do not silently drop a clause's per-clause scores.
-  const keyOf = (clauseType: string, sectionNumber: string | null | undefined): string =>
-    `${clauseType}|${(sectionNumber ?? '').trim().toLowerCase().replace(/\s+/g, ' ')}`
-  const idByKey = new Map<string, string>()
-  for (const r of reviews ?? []) idByKey.set(keyOf(r.clause_type, r.section_number), r.id)
+    .order('display_order', { ascending: true })
+  if (reviewsError) {
+    // Abort the write entirely: pairing clause scores would be impossible, and persisting
+    // would prune the existing valid run and save an incomplete one.
+    console.error(`Failed to fetch clause reviews for scoring; skipping persist: ${reviewsError.message}`)
+    return
+  }
+  const reviewIdForScore = pairScoreReviewIds(scored.clauseScores, reviews ?? [])
 
   const b = scored.binaryChecks
   // One eval run per session. Insert the new run first, then prune older runs (cascade
@@ -73,6 +83,9 @@ async function persist(sessionId: string, scored: EvaluateOutput): Promise<void>
       consistency_note: b.internalConsistency.note,
       improvement_notes: scored.improvementNotes,
       dimension_rationales: scored.dimensionRationales,
+      issue_coverage: scored.issueCoverage.score,
+      issue_coverage_rationale: scored.issueCoverage.rationale,
+      missed_issues: scored.issueCoverage.missedIssues,
     })
     .select('id')
   if (runError || !runRows?.[0]) {
@@ -90,8 +103,8 @@ async function persist(sessionId: string, scored: EvaluateOutput): Promise<void>
   if (pruneError) console.error(`Failed to prune old eval runs: ${pruneError.message}`)
 
   const clauseRows = scored.clauseScores
-    .map((cs) => {
-      const clauseReviewId = idByKey.get(keyOf(cs.clauseType, cs.sectionNumber))
+    .map((cs, i) => {
+      const clauseReviewId = reviewIdForScore[i]
       if (!clauseReviewId) return null
       return {
         eval_run_id: evalRunId,
@@ -135,11 +148,18 @@ export async function GET(request: NextRequest): Promise<Response> {
 
         const { data: session } = await supabase
           .from('sessions')
-          .select('document_type, use_case, governing_law, signatory_type, mode, party_perspective')
+          .select(
+            'document_type, use_case, governing_law, signatory_type, mode, party_perspective, document_text',
+          )
           .eq('id', sessionId)
           .single()
 
-        const { data: reviews } = await supabase
+        if (!session) {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: 'Session not found' })}\n\n`))
+          return
+        }
+
+        const { data: reviews, error: reviewsError } = await supabase
           .from('clause_reviews')
           .select(
             'clause_type, section_number, priority_tier, original_text, proposed_text, rationale, citation, counterparty_prediction',
@@ -147,12 +167,30 @@ export async function GET(request: NextRequest): Promise<Response> {
           .eq('session_id', sessionId)
           .order('display_order', { ascending: true })
 
+        if (reviewsError) {
+          console.error(`Failed to load redlines to evaluate: ${reviewsError.message}`)
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: 'Could not load redlines' })}\n\n`))
+          return
+        }
         if (!reviews || reviews.length === 0) {
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: 'No redlines to evaluate' })}\n\n`))
           return
         }
 
-        const prompt = `Document classification:\n${JSON.stringify(session, null, 2)}\n\nRedlines to evaluate:\n${JSON.stringify(reviews, null, 2)}`
+        const documentText = session?.document_text ?? ''
+        const classification = {
+          documentType: session?.document_type,
+          useCase: session?.use_case,
+          governingLaw: session?.governing_law,
+          signatoryType: session?.signatory_type,
+          mode: session?.mode,
+          partyPerspective: session?.party_perspective,
+        }
+        const prompt = [
+          `Document classification:\n${JSON.stringify(classification, null, 2)}`,
+          `Full document under review (every clause, including those the redlines did not touch):\n${documentText}`,
+          `Redlines that were made (evaluate their quality, and assess coverage against the full document above):\n${JSON.stringify(reviews, null, 2)}`,
+        ].join('\n\n')
 
         const output = await generateStructured({
           schema: EvaluateOutputSchema,

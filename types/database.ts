@@ -20,7 +20,7 @@ export interface Database {
         Row: SessionRow
         Insert: Insert<
           SessionRow,
-          'id' | 'created_at' | 'status' | 'export_generated_at' | 'is_benchmark'
+          'id' | 'created_at' | 'status' | 'export_generated_at' | 'is_benchmark' | 'document_text'
         >
         Update: Partial<SessionRow>
         Relationships: []
@@ -41,7 +41,16 @@ export interface Database {
       }
       eval_runs: {
         Row: EvalRunRow
-        Insert: Insert<EvalRunRow, 'id' | 'created_at' | 'improvement_notes' | 'dimension_rationales'>
+        Insert: Insert<
+          EvalRunRow,
+          | 'id'
+          | 'created_at'
+          | 'improvement_notes'
+          | 'dimension_rationales'
+          | 'issue_coverage'
+          | 'issue_coverage_rationale'
+          | 'missed_issues'
+        >
         Update: Partial<EvalRunRow>
         Relationships: []
       }

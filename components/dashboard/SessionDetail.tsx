@@ -9,6 +9,7 @@ import { DIMENSION_GUIDE, type DimensionKey } from '@/lib/dimension-guide'
 import { PriorityBadge } from '@/components/ui/Badge'
 import { ScoreBadge } from '@/components/dashboard/shared'
 import { DimensionAccordion } from '@/components/eval/DimensionAccordion'
+import { CoverageSection } from '@/components/eval/CoverageSection'
 
 const CHECKS = [
   { key: 'dtsaNotice', label: 'DTSA Notice' },
@@ -244,6 +245,20 @@ export function SessionDetail({ data }: { data: SessionDetailData }): React.Reac
               clauseScores={evalRun.clauseScores}
             />
           </div>
+
+          {evalRun.issueCoverage && (
+            <div className="rounded-md border border-border bg-surface p-6 shadow-sm">
+              <p className="mb-1 text-sm font-semibold uppercase tracking-widest text-text-secondary">
+                Issue coverage
+              </p>
+              <p className="mb-4 text-xs text-text-muted">
+                Precision measures the quality of the redlines made; coverage measures how many of
+                the material issues in the document they caught. The overall score is a
+                recall-weighted F-score of the two.
+              </p>
+              <CoverageSection dimensions={evalRun.dimensions} issueCoverage={evalRun.issueCoverage} />
+            </div>
+          )}
 
           {evalRun.improvementNotes.length > 0 && (
             <div className="rounded-md border border-border bg-surface p-6 shadow-sm">
