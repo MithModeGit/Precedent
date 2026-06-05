@@ -1,19 +1,11 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import type { BinaryResult } from '@/types'
 import type { ClausePerformance, SessionWithEval } from '@/lib/dashboard-queries'
 import { clauseTypeLabel } from '@/lib/clause-labels'
 import { StatCard, DimensionBar } from '@/components/dashboard/shared'
 import { ScoreTrendChart, type TrendPoint } from '@/components/dashboard/ScoreTrendChart'
-
-const DAY = 24 * 60 * 60 * 1000
-const RANGES = [
-  { label: '7 Days', days: 7 },
-  { label: '30 Days', days: 30 },
-  { label: '90 Days', days: 90 },
-  { label: 'All Time', days: null as number | null },
-]
 
 const DIMENSIONS = [
   { key: 'legalAccuracy', label: 'Legal Accuracy' },
@@ -64,52 +56,25 @@ function computeMetrics(list: SessionWithEval[]): Metrics {
   }
 }
 
-function delta(current: number | null, prior: number | null): 'up' | 'down' | 'flat' {
-  if (current == null || prior == null) return 'flat'
-  if (current - prior > 0.05) return 'up'
-  if (prior - current > 0.05) return 'down'
-  return 'flat'
-}
-
 export function TrendOverview({
   sessions,
   clausePerformance,
   scoreDistribution,
-  now,
 }: {
   sessions: SessionWithEval[]
   clausePerformance: ClausePerformance[]
   scoreDistribution: Record<number, number>
-  now: number
 }): React.ReactElement {
-  const [rangeIdx, setRangeIdx] = useState(1)
-  const days = RANGES[rangeIdx]?.days ?? null
-
-  const { current, prior } = useMemo(() => {
-    if (days == null) {
-      return { current: sessions, prior: [] as SessionWithEval[] }
-    }
-    const start = now - days * DAY
-    const priorStart = now - 2 * days * DAY
-    return {
-      current: sessions.filter((s) => new Date(s.createdAt).getTime() >= start),
-      prior: sessions.filter((s) => {
-        const t = new Date(s.createdAt).getTime()
-        return t >= priorStart && t < start
-      }),
-    }
-  }, [sessions, days, now])
-
-  const cur = useMemo(() => computeMetrics(current), [current])
-  const pri = useMemo(() => computeMetrics(prior), [prior])
+  const metrics = useMemo(() => computeMetrics(sessions), [sessions])
+  const sessionsWithChecks = useMemo(() => sessions.filter((s) => s.binaryChecks), [sessions])
 
   const trendData: TrendPoint[] = useMemo(
     () =>
-      current
+      sessions
         .filter((s) => s.overallScore !== null)
         .map((s) => {
           // X-axis is keyed on the document, not the date, so the trend still reads when
-          // several benchmarks share a date. The hover tooltip shows the full name.
+          // several sessions share a date. The hover tooltip shows the full name.
           const base = (s.documentName ?? '').replace(/\.docx$/i, '').replace(/\s*NDA$/i, '').trim()
           return {
             date: new Date(s.createdAt).toLocaleDateString('en-US', {
@@ -123,7 +88,7 @@ export function TrendOverview({
             documentType: s.documentType ?? '',
           }
         }),
-    [current],
+    [sessions],
   )
 
   const sortedClauses = useMemo(
@@ -131,16 +96,17 @@ export function TrendOverview({
     [clausePerformance],
   )
 
-  // Weakest dimension this period: the lowest current average, to point the team at it.
+  // Weakest dimension: the lowest average, to point the team at where to improve.
   const weakestDimension = useMemo(() => {
-    if (!cur.dimensions) return null
+    if (!metrics.dimensions) return null
     const lowest = DIMENSIONS.reduce(
-      (low, d) => ((cur.dimensions![d.key] ?? 5) < (cur.dimensions![low.key] ?? 5) ? d : low),
+      (low, d) =>
+        (metrics.dimensions![d.key] ?? 5) < (metrics.dimensions![low.key] ?? 5) ? d : low,
       DIMENSIONS[0],
     )
     // Only surface a "weakest" if it actually has room to improve (not a perfect 5).
-    return (cur.dimensions[lowest.key] ?? 5) < 5 ? lowest : null
-  }, [cur.dimensions])
+    return (metrics.dimensions[lowest.key] ?? 5) < 5 ? lowest : null
+  }, [metrics.dimensions])
 
   const distTotal = useMemo(
     () => Object.values(scoreDistribution).reduce((a, b) => a + b, 0),
@@ -150,39 +116,19 @@ export function TrendOverview({
 
   return (
     <div className="space-y-8">
-      <div className="flex justify-end">
-        <div className="inline-flex rounded-md border border-border">
-          {RANGES.map((r, i) => (
-            <button
-              key={r.label}
-              type="button"
-              onClick={() => setRangeIdx(i)}
-              className={`px-3 py-1.5 text-xs font-medium first:rounded-l-md last:rounded-r-md ${
-                rangeIdx === i ? 'bg-navy text-surface' : 'bg-surface text-text-secondary'
-              }`}
-            >
-              {r.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard
-          value={cur.avgScore != null ? `${cur.avgScore.toFixed(1)} / 5.0` : 'N/A'}
+          value={metrics.avgScore != null ? `${metrics.avgScore.toFixed(1)} / 5.0` : 'N/A'}
           label="Average Quality Score"
-          trend={delta(cur.avgScore, pri.avgScore)}
         />
-        <StatCard value={String(cur.count)} label="Sessions Completed" />
+        <StatCard value={String(metrics.count)} label="Sessions Completed" />
         <StatCard
-          value={cur.acceptanceRate != null ? `${Math.round(cur.acceptanceRate * 100)}%` : 'N/A'}
+          value={metrics.acceptanceRate != null ? `${Math.round(metrics.acceptanceRate * 100)}%` : 'N/A'}
           label="Redline Acceptance Rate"
-          trend={delta(cur.acceptanceRate, pri.acceptanceRate)}
         />
         <StatCard
-          value={cur.passRate != null ? `${Math.round(cur.passRate * 100)}%` : 'N/A'}
+          value={metrics.passRate != null ? `${Math.round(metrics.passRate * 100)}%` : 'N/A'}
           label="Binary Check Pass Rate"
-          trend={delta(cur.passRate, pri.passRate)}
         />
       </div>
 
@@ -198,25 +144,26 @@ export function TrendOverview({
           <p className="mb-4 text-sm font-semibold uppercase tracking-widest text-text-secondary">
             Dimension performance
           </p>
-          {cur.dimensions ? (
+          {metrics.dimensions ? (
             <div className="space-y-3">
               {DIMENSIONS.map((d) => (
                 <DimensionBar
                   key={d.key}
                   label={d.label}
-                  score={cur.dimensions![d.key] ?? 0}
-                  priorScore={pri.dimensions?.[d.key] ?? null}
+                  score={metrics.dimensions![d.key] ?? 0}
+                  priorScore={null}
                 />
               ))}
             </div>
           ) : (
-            <p className="text-sm text-text-secondary">No evaluation data in this period.</p>
+            <p className="text-sm text-text-secondary">No evaluation data yet.</p>
           )}
           {weakestDimension && (
             <p className="mt-4 border-t border-border-subtle pt-3 text-xs text-text-secondary">
               <span className="font-medium text-text-primary">Weakest dimension: </span>
-              {weakestDimension.label} ({(cur.dimensions?.[weakestDimension.key] ?? 0).toFixed(1)}/5).
-              This is where the redline engine has the most room to improve in this period.
+              {weakestDimension.label} (
+              {(metrics.dimensions?.[weakestDimension.key] ?? 0).toFixed(1)}/5). This is where the
+              redline engine has the most room to improve.
             </p>
           )}
         </div>
@@ -227,7 +174,6 @@ export function TrendOverview({
           </p>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             {CHECKS.map((c) => {
-              const sessionsWithChecks = current.filter((s) => s.binaryChecks)
               const passes = sessionsWithChecks.filter((s) => s.binaryChecks![c.key] === 'PASS').length
               const rate = sessionsWithChecks.length ? passes / sessionsWithChecks.length : null
               const pct = rate != null ? Math.round(rate * 100) : null
@@ -272,10 +218,7 @@ export function TrendOverview({
                     {score}
                   </span>
                   <span className="h-3 flex-1 rounded-full bg-surface-raised">
-                    <span
-                      className="block h-3 rounded-full bg-navy"
-                      style={{ width: `${pct}%` }}
-                    />
+                    <span className="block h-3 rounded-full bg-navy" style={{ width: `${pct}%` }} />
                   </span>
                   <span className="w-16 shrink-0 text-right font-mono text-xs text-text-secondary">
                     {n} ({pct}%)

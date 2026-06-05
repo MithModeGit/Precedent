@@ -6,7 +6,6 @@ export const dynamic = 'force-dynamic'
 
 export default async function DashboardPage(): Promise<React.ReactElement> {
   const data = await getDashboardData()
-  const now = Date.now()
 
   return (
     <main className="mx-auto max-w-6xl px-6 py-10">
@@ -16,7 +15,7 @@ export default async function DashboardPage(): Promise<React.ReactElement> {
           Home
         </Link>
       </div>
-      <EvalDashboard data={data} now={now} />
+      <EvalDashboard data={data} />
     </main>
   )
 }

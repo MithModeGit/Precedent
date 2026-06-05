@@ -1,6 +1,6 @@
-import { createGoogleGenerativeAI } from '@ai-sdk/google'
+import { GoogleGenAI, ThinkingLevel } from '@google/genai'
 import { createAnthropic } from '@ai-sdk/anthropic'
-import { generateObject, generateText } from 'ai'
+import { generateText } from 'ai'
 import { zodToJsonSchema } from 'zod-to-json-schema'
 import type { z } from 'zod'
 import { GEMINI_MODEL_ID, CLAUDE_JUDGE_MODEL_ID, serverEnv } from '@/lib/env'
@@ -30,6 +30,14 @@ export function extractJsonObject(text: string): unknown {
   }
 }
 
+// Reuse a single Gemini client across passes rather than recreating it per call. Created
+// lazily so the server-only API key is read on first use, not at module load.
+let genAIClient: GoogleGenAI | null = null
+function getGenAI(): GoogleGenAI {
+  if (!genAIClient) genAIClient = new GoogleGenAI({ apiKey: serverEnv.googleApiKey })
+  return genAIClient
+}
+
 export type PipelinePass = 1 | 2 | 3 | 4
 
 /** Error carrying which pipeline pass failed, for structured API error responses. */
@@ -51,37 +59,35 @@ interface GenerateStructuredOptions<T> {
 }
 
 /**
- * Runs a single structured-output pass against Gemini. Retries once on failure
- * (transient error or schema-validation miss), then throws a PipelineError.
+ * Runs a structured-output generator pass on Gemini via the official @google/genai SDK.
+ * Unlike the Vercel AI SDK's tool-mode generateObject (which triggered runaway dynamic
+ * thinking that consumed the 64k output budget and truncated the JSON), the official SDK
+ * honors thinking_level, so high reasoning stays bounded and the response completes. We
+ * request JSON output, inject the JSON Schema into the prompt, and validate with Zod.
+ * Retries on a transient or unparseable result, then throws a PipelineError.
  */
 export async function generateStructured<T>(opts: GenerateStructuredOptions<T>): Promise<T> {
-  // Build the provider with the sanitized key rather than the default google() provider,
-  // which reads process.env.GOOGLE_GENERATIVE_AI_API_KEY directly and would inherit any
-  // BOM/whitespace, breaking the request's auth header.
-  const google = createGoogleGenerativeAI({ apiKey: serverEnv.googleApiKey })
-  const model = google(GEMINI_MODEL_ID)
+  const ai = getGenAI()
+  const schemaJson = JSON.stringify(zodToJsonSchema(opts.schema, { $refStrategy: 'none' }), null, 2)
+  const prompt = `${opts.prompt}\n\nReturn ONLY a single JSON object (no markdown fences, no commentary) that conforms exactly to this JSON Schema:\n${schemaJson}`
 
-  // Thinking strategy for Gemini 3 Flash: its default is high *dynamic* thinking, which gives
-  // the most thorough review but is uncontrollable here. The model ignores an explicit
-  // thinking_budget cap (the installed SDK cannot send Gemini 3's thinking_level), so on some
-  // documents dynamic thinking consumes nearly the whole 64k output budget and truncates the
-  // JSON (finishReason "length"). Strategy: attempt 1 uses full thinking (best quality where it
-  // fits); if it fails, fall back to thinking disabled (thinking_budget 0 IS honored), which
-  // guarantees the full structured output. Robust everywhere, deep reasoning where it fits.
-  // Temperature is left at the Gemini 3 default of 1.0 (lowering it degrades quality).
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
-      const { object } = await generateObject({
-        model,
-        schema: opts.schema,
-        system: opts.system,
-        prompt: opts.prompt,
-        maxTokens: 65536,
-        ...(attempt === 1
-          ? {}
-          : { providerOptions: { google: { thinkingConfig: { thinkingBudget: 0 } } } }),
+      const response = await ai.models.generateContent({
+        model: GEMINI_MODEL_ID,
+        contents: prompt,
+        config: {
+          systemInstruction: opts.system,
+          // High reasoning, reliably bounded by thinking_level (the official SDK honors it),
+          // so thinking never consumes the output budget. Temperature left at the default 1.0.
+          thinkingConfig: { thinkingLevel: ThinkingLevel.HIGH },
+          responseMimeType: 'application/json',
+          maxOutputTokens: 65536,
+        },
       })
-      return object
+      const text = response.text
+      if (!text) throw new Error('Empty response from the generator')
+      return opts.schema.parse(extractJsonObject(text))
     } catch (error) {
       if (attempt === 3) {
         throw new PipelineError(opts.pass, error)
