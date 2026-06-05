@@ -248,12 +248,12 @@ async function seedOne(b: Benchmark): Promise<void> {
   const evalRunId = runRows?.[0]?.id
   if (!evalRunId) throw new Error('Failed to insert eval run')
 
-  const idByKey = new Map(
-    (insertedClauses ?? []).map((c) => [`${c.clause_type}|${c.section_number}`, c.id]),
-  )
+  // The evaluator scores redlines in the order it was given them, which is the order the
+  // clause reviews were inserted, so pair by position rather than by a fragile key.
+  const insertedIds = (insertedClauses ?? []).map((c) => c.id)
   const clauseScoreRows = evalOut.clauseScores
-    .map((cs) => {
-      const clauseReviewId = idByKey.get(`${cs.clauseType}|${cs.sectionNumber}`)
+    .map((cs, i) => {
+      const clauseReviewId = insertedIds[i]
       if (!clauseReviewId) return null
       const clauseOverall = round2(weightedDimensionScore(cs.dimensions))
       return {
