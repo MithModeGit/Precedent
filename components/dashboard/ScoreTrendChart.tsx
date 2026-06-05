@@ -13,6 +13,7 @@ import {
 
 export interface TrendPoint {
   date: string
+  label: string
   overallScore: number
   documentName: string
   documentType: string
@@ -31,8 +32,9 @@ export function ScoreTrendChart({ data }: { data: TrendPoint[] }): React.ReactEl
       <LineChart data={data} margin={{ top: 8, right: 16, bottom: 8, left: -8 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
         <XAxis
-          dataKey="date"
-          tick={{ fontFamily: 'var(--font-dm-sans)', fontSize: 12, fill: 'var(--color-text-secondary)' }}
+          dataKey="label"
+          interval={0}
+          tick={{ fontFamily: 'var(--font-dm-sans)', fontSize: 11, fill: 'var(--color-text-secondary)' }}
         />
         <YAxis
           domain={[0, 5]}

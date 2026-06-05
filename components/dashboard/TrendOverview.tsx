@@ -107,16 +107,22 @@ export function TrendOverview({
     () =>
       current
         .filter((s) => s.overallScore !== null)
-        .map((s) => ({
-          date: new Date(s.createdAt).toLocaleDateString('en-US', {
-            month: 'short',
-            day: 'numeric',
-            timeZone: 'UTC',
-          }),
-          overallScore: s.overallScore as number,
-          documentName: s.documentName,
-          documentType: s.documentType,
-        })),
+        .map((s) => {
+          // X-axis is keyed on the document, not the date, so the trend still reads when
+          // several benchmarks share a date. The hover tooltip shows the full name.
+          const base = s.documentName.replace(/\.docx$/i, '').replace(/\s*NDA$/i, '').trim()
+          return {
+            date: new Date(s.createdAt).toLocaleDateString('en-US', {
+              month: 'short',
+              day: 'numeric',
+              timeZone: 'UTC',
+            }),
+            label: base.length > 20 ? `${base.slice(0, 19)}…` : base,
+            overallScore: s.overallScore as number,
+            documentName: s.documentName,
+            documentType: s.documentType,
+          }
+        }),
     [current],
   )
 

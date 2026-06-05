@@ -17,6 +17,12 @@
  */
 export const GEMINI_MODEL_ID = 'gemini-3-flash-preview'
 
+/**
+ * The Claude model used as the evaluation judge (Pass 3). Using a different model family
+ * for the judge than for redline generation removes the same-model self-grading bias.
+ */
+export const CLAUDE_JUDGE_MODEL_ID = 'claude-sonnet-4-6'
+
 /** Byte Order Mark code point (U+FEFF). */
 const BOM = 0xfeff
 
@@ -63,5 +69,11 @@ export const serverEnv = {
       throw new Error('Server-only environment variable GOOGLE_GENERATIVE_AI_API_KEY read in the browser.')
     }
     return required('GOOGLE_GENERATIVE_AI_API_KEY', process.env.GOOGLE_GENERATIVE_AI_API_KEY)
+  },
+  get anthropicApiKey(): string {
+    if (typeof window !== 'undefined') {
+      throw new Error('Server-only environment variable ANTHROPIC_API_KEY read in the browser.')
+    }
+    return required('ANTHROPIC_API_KEY', process.env.ANTHROPIC_API_KEY)
   },
 }
