@@ -24,7 +24,7 @@ export function extractJsonObject(text: string): unknown {
   } catch {
     const start = trimmed.indexOf('{')
     const end = trimmed.lastIndexOf('}')
-    if (start === -1 || end === -1) throw new Error('No JSON object found in evaluator output')
+    if (start === -1 || end <= start) throw new Error('No JSON object found in evaluator output')
     return JSON.parse(trimmed.slice(start, end + 1))
   }
 }
