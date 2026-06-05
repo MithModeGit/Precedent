@@ -1,11 +1,12 @@
 /**
- * Synthetic NDA benchmark seeding. Runs Passes 1-3 on the three synthetic NDAs and
- * stores them as benchmark sessions (is_benchmark = true) under fixed UUIDs, so the
- * evaluation dashboard and home screen show meaningful data before any real session.
+ * Re-runs the full pipeline (Pass 1 classify -> Pass 2 redline -> Pass 3 Claude evaluate) on
+ * an existing real session, using its stored original document, and updates its redlines and
+ * evaluation in place. Used to re-judge a real session with the current improved engine.
  *
- * Run after environment setup: npm run seed
+ * Run: npx tsx scripts/rerun-session.ts <sessionId>
  */
 import 'dotenv/config'
+import mammoth from 'mammoth'
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import { createClient } from '@supabase/supabase-js'
@@ -25,70 +26,14 @@ import {
 import { pairScoreReviewIds } from '../lib/eval-pairing'
 import { generateStructured, generateJudged } from '../lib/pipeline'
 
-const BENCHMARK_DEVICE = '00000000-0000-4000-8000-0000000000aa'
 const round2 = (n: number): number => Math.round(n * 100) / 100
-
-interface Benchmark {
-  id: string
-  file: string
-  documentName: string
-  perspective: 'disclosing' | 'receiving'
-  mode: 'conservative' | 'standard' | 'aggressive'
-  createdAt: string
-  kind: 'standard' | 'adversarial'
-}
-
-// All benchmarks were produced over two days of work. Fixed dates (rather than relative
-// offsets) keep the dashboard honest about the timeline; the three standard NDAs are dated
-// June 3 and the adversarial one June 4, ordered by time so the trend reads left to right.
-const BENCHMARKS: Benchmark[] = [
-  {
-    id: '00000000-0000-4000-8000-000000000001',
-    file: 'nda-1-saas.md',
-    documentName: 'Mutual SaaS Vendor NDA.docx',
-    perspective: 'receiving',
-    mode: 'standard',
-    createdAt: '2026-06-03T15:00:00Z',
-    kind: 'standard',
-  },
-  {
-    id: '00000000-0000-4000-8000-000000000002',
-    file: 'nda-2-employment.md',
-    documentName: 'Employment Contractor NDA.docx',
-    perspective: 'receiving',
-    mode: 'standard',
-    createdAt: '2026-06-03T18:00:00Z',
-    kind: 'standard',
-  },
-  {
-    id: '00000000-0000-4000-8000-000000000003',
-    file: 'nda-3-manda.md',
-    documentName: 'M&A Due Diligence NDA.docx',
-    perspective: 'receiving',
-    mode: 'standard',
-    createdAt: '2026-06-03T21:00:00Z',
-    kind: 'standard',
-  },
-  {
-    // Deliberately hard / adversarial document to test that the evaluator discriminates.
-    id: '00000000-0000-4000-8000-000000000004',
-    file: 'nda-4-hard.md',
-    documentName: 'Cross-Border Data Partnership NDA.docx',
-    perspective: 'receiving',
-    mode: 'standard',
-    createdAt: '2026-06-04T16:00:00Z',
-    kind: 'adversarial',
-  },
-]
-
+const normalize = (t: string): string => t.replace(/\s+/g, ' ').trim().toLowerCase()
 const TIERS_BY_MODE: Record<string, string[]> = {
   conservative: ['must'],
   standard: ['must', 'should'],
   aggressive: ['must', 'should', 'nice'],
 }
 
-// Prefer the service-role key for this admin seed when present (bypasses RLS); fall
-// back to the publishable key, which works under the current no-RLS MVP posture.
 const supabase = createClient<Database>(
   process.env.NEXT_PUBLIC_SUPABASE_URL as string,
   (process.env.SUPABASE_SECRET_KEY ??
@@ -96,29 +41,31 @@ const supabase = createClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY) as string,
 )
 
-function loadNda(file: string): string {
-  const raw = readFileSync(join(process.cwd(), 'lib/synthetic-ndas', file), 'utf-8')
-  return raw
-    .split('\n')
-    .filter((l) => !l.startsWith('#'))
-    .join('\n')
-    .trim()
-}
+async function main(): Promise<void> {
+  const sessionId = process.argv[2]
+  if (!sessionId) throw new Error('usage: npx tsx scripts/rerun-session.ts <sessionId>')
 
-function normalize(t: string): string {
-  return t.replace(/\s+/g, ' ').trim().toLowerCase()
-}
+  const { data: session, error } = await supabase
+    .from('sessions')
+    .select('*')
+    .eq('id', sessionId)
+    .single()
+  if (error || !session) throw new Error(`Session not found: ${error?.message ?? sessionId}`)
+  console.warn(`Re-running ${session.document_name} (${session.mode}, ${session.party_perspective}) ...`)
 
-async function seedOne(b: Benchmark): Promise<void> {
-  console.warn(`\nSeeding ${b.documentName} ...`)
-  const text = loadNda(b.file)
+  const { data: blob, error: dlErr } = await supabase.storage
+    .from('uploads')
+    .download(`${sessionId}/original.docx`)
+  if (dlErr || !blob) throw new Error(`Could not download original.docx: ${dlErr?.message}`)
+  const buffer = Buffer.from(await blob.arrayBuffer())
+  const { value: text } = await mammoth.extractRawText({ buffer })
+
   const referenceDatabase = readFileSync(
     join(process.cwd(), 'lib/nda-reference-database.md'),
     'utf-8',
   )
-  const createdAt = b.createdAt
 
-  // Pass 1. Reuses the live route's generator helper (same model, bounded high thinking).
+  // Pass 1 (same generator helper as the live route)
   const classification = await generateStructured({
     schema: ClassifyOutputSchema,
     system: CLASSIFY_SYSTEM_PROMPT,
@@ -126,7 +73,7 @@ async function seedOne(b: Benchmark): Promise<void> {
     pass: 1,
   })
 
-  // Pass 2. Same helper as the live route.
+  // Pass 2 (preserve the session's original perspective and mode)
   const redlineOut = await generateStructured({
     schema: RedlineOutputSchema,
     system: buildRedlineSystemPrompt({
@@ -135,72 +82,20 @@ async function seedOne(b: Benchmark): Promise<void> {
       useCase: classification.useCase,
       governingLaw: classification.governingLaw,
       signatoryType: classification.signatoryType,
-      partyPerspective: b.perspective,
-      mode: b.mode,
+      partyPerspective: session.party_perspective,
+      mode: session.mode,
     }),
     prompt: `Clauses to review:\n${JSON.stringify(classification.clauses, null, 2)}`,
     pass: 2,
   })
-  const allowed = TIERS_BY_MODE[b.mode] ?? ['must', 'should']
+  const allowed = TIERS_BY_MODE[session.mode] ?? ['must', 'should']
   const redlines = redlineOut.redlines.filter((r) => allowed.includes(r.priority))
-
-  // Replace any prior data for this benchmark id (cascades clause_reviews + eval rows).
-  const { error: deleteError } = await supabase.from('sessions').delete().eq('id', b.id)
-  if (deleteError) throw new Error(`Failed to delete benchmark session: ${deleteError.message}`)
 
   const documentText = classification.clauses
     .map((c) => `[${c.clauseType} §${c.sectionNumber}] ${c.text}`)
     .join('\n\n')
 
-  const { error: sessionError } = await supabase.from('sessions').insert({
-    id: b.id,
-    device_id: BENCHMARK_DEVICE,
-    created_at: createdAt,
-    document_name: b.documentName,
-    document_type: classification.documentType,
-    use_case: classification.useCase,
-    governing_law: classification.governingLaw,
-    signatory_type: classification.signatoryType,
-    party_perspective: b.perspective,
-    mode: b.mode,
-    status: 'exported',
-    export_generated_at: createdAt,
-    is_benchmark: true,
-    benchmark_kind: b.kind,
-    document_text: documentText,
-  })
-  if (sessionError) throw new Error(`Failed to insert benchmark session: ${sessionError.message}`)
-
-  const orderBySection = new Map<string, number>()
-  classification.clauses.forEach((c, i) => {
-    if (!orderBySection.has(normalize(c.text))) orderBySection.set(normalize(c.text), i)
-  })
-
-  const clauseRows = redlines.map((r, i) => ({
-    session_id: b.id,
-    clause_type: r.clauseType,
-    section_number: r.sectionNumber,
-    priority_tier: r.priority,
-    original_text: r.originalText,
-    proposed_text: r.proposedText,
-    rationale: r.rationale,
-    citation: r.citation,
-    counterparty_prediction: r.counterpartyPrediction,
-    no_action_needed: r.noActionNeeded,
-    // Benchmarks simulate a lawyer who accepted the AI redlines.
-    decision: 'accepted' as const,
-    accepted_text: r.proposedText,
-    decided_at: createdAt,
-    display_order: orderBySection.get(normalize(r.originalText)) ?? i,
-  }))
-  const { data: insertedClauses, error: clauseError } = await supabase
-    .from('clause_reviews')
-    .insert(clauseRows)
-    .select('id, clause_type, section_number')
-  if (clauseError) throw new Error(`Failed to insert clause reviews: ${clauseError.message}`)
-
-  // Pass 3: judged by Claude (a different model family than the Gemini generator) via the
-  // shared generateJudged, so benchmarks are scored exactly as live reviews are.
+  // Pass 3 (Claude judge)
   const evalOut = await generateJudged({
     schema: EvaluateOutputSchema,
     pass: 3,
@@ -212,17 +107,52 @@ async function seedOne(b: Benchmark): Promise<void> {
     ].join('\n\n'),
   })
 
+  // Clear the session's prior review and evaluation (keep the session row itself).
+  await supabase.from('eval_runs').delete().eq('session_id', sessionId)
+  await supabase.from('clause_reviews').delete().eq('session_id', sessionId)
+  await supabase
+    .from('sessions')
+    .update({ document_text: documentText, status: 'exported' })
+    .eq('id', sessionId)
+
+  const orderBySection = new Map<string, number>()
+  classification.clauses.forEach((c, i) => {
+    if (!orderBySection.has(normalize(c.text))) orderBySection.set(normalize(c.text), i)
+  })
+  const decidedAt = session.created_at
+  const clauseRows = redlines.map((r, i) => ({
+    session_id: sessionId,
+    clause_type: r.clauseType,
+    section_number: r.sectionNumber,
+    priority_tier: r.priority,
+    original_text: r.originalText,
+    proposed_text: r.proposedText,
+    rationale: r.rationale,
+    citation: r.citation,
+    counterparty_prediction: r.counterpartyPrediction,
+    no_action_needed: r.noActionNeeded,
+    decision: 'accepted' as const,
+    accepted_text: r.proposedText,
+    decided_at: decidedAt,
+    display_order: orderBySection.get(normalize(r.originalText)) ?? i,
+  }))
+  const { data: insertedClauses, error: clauseError } = await supabase
+    .from('clause_reviews')
+    .insert(clauseRows)
+    .select('id, clause_type, section_number')
+  if (clauseError) throw new Error(`Failed to insert clause reviews: ${clauseError.message}`)
+
   const overallScore = calculateOverallScore(
     evalOut.dimensions,
     evalOut.binaryChecks,
     evalOut.issueCoverage.score,
   )
   const b3 = evalOut.binaryChecks
-  const { data: runRows } = await supabase
+  const { data: runRows, error: runError } = await supabase
     .from('eval_runs')
     .insert({
-      session_id: b.id,
-      created_at: createdAt,
+      session_id: sessionId,
+      created_at: session.created_at,
       overall_score: overallScore,
       legal_accuracy: evalOut.dimensions.legalAccuracy,
       market_calibration: evalOut.dimensions.marketCalibration,
@@ -247,10 +177,8 @@ async function seedOne(b: Benchmark): Promise<void> {
     })
     .select('id')
   const evalRunId = runRows?.[0]?.id
-  if (!evalRunId) throw new Error('Failed to insert eval run')
+  if (runError || !evalRunId) throw new Error(`Failed to insert eval run: ${runError?.message}`)
 
-  // Pair per-clause scores to the inserted reviews with the hybrid (key, then order)
-  // strategy, robust to a format drift or a skipped clause.
   const reviewIdForScore = pairScoreReviewIds(evalOut.clauseScores, insertedClauses ?? [])
   const clauseScoreRows = evalOut.clauseScores
     .map((cs, i) => {
@@ -274,9 +202,9 @@ async function seedOne(b: Benchmark): Promise<void> {
       }
     })
     .filter((r): r is NonNullable<typeof r> => r !== null)
-
   if (clauseScoreRows.length > 0) {
-    await supabase.from('eval_clause_scores').insert(clauseScoreRows)
+    const { error: scoreError } = await supabase.from('eval_clause_scores').insert(clauseScoreRows)
+    if (scoreError) throw new Error(`Failed to insert clause scores: ${scoreError.message}`)
   }
 
   console.warn(
@@ -284,20 +212,7 @@ async function seedOne(b: Benchmark): Promise<void> {
   )
 }
 
-async function main(): Promise<void> {
-  // Optional CLI filter: `npm run seed -- nda-4-hard.md` seeds only matching files/ids,
-  // leaving the other benchmarks untouched.
-  const filter = process.argv.slice(2)
-  const list = filter.length
-    ? BENCHMARKS.filter((b) => filter.includes(b.file) || filter.includes(b.id))
-    : BENCHMARKS
-  for (const b of list) {
-    await seedOne(b)
-  }
-  console.warn('\nBenchmark seeding complete.')
-}
-
 main().catch((e) => {
-  console.error(e)
-  process.exit(1)
+  console.error('rerun-session failed:', e instanceof Error ? e.message : String(e))
+  process.exitCode = 1
 })

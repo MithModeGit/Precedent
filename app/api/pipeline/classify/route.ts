@@ -7,7 +7,8 @@ import { ClassifyOutputSchema } from '@/schemas/classify'
 import { CLASSIFY_SYSTEM_PROMPT } from '@/prompts/classify'
 
 export const runtime = 'nodejs'
-export const maxDuration = 120
+// Classification now runs with high thinking; give it headroom.
+export const maxDuration = 180
 
 /** Server-side upload ceiling: guards function memory/time and cost against a client
  * pointing the session at an oversized object. Mirrors the client-side limit. */

@@ -63,6 +63,11 @@ export function SessionIndex({ sessions }: { sessions: SessionWithEval[] }): Rea
                         Benchmark
                       </span>
                     )}
+                    {s.benchmarkKind === 'adversarial' && (
+                      <span className="ml-2 rounded-full border border-must px-2 py-0.5 text-[10px] text-must">
+                        Stress test
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-text-secondary">
                     {new Date(s.createdAt).toLocaleDateString('en-US', {
