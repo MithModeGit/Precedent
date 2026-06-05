@@ -20,7 +20,11 @@ const round2 = (n: number): number => Math.round(n * 100) / 100
 
 /** Builds the SSE payload, applying server-computed overall scores and confidence signals. */
 function applyServerScores(output: EvaluateOutput): EvaluateOutput {
-  const overallScore = calculateOverallScore(output.dimensions, output.binaryChecks)
+  const overallScore = calculateOverallScore(
+    output.dimensions,
+    output.binaryChecks,
+    output.issueCoverage.score,
+  )
   const clauseScores = output.clauseScores.map((cs) => {
     const clauseOverallScore = round2(weightedDimensionScore(cs.dimensions))
     const failed = clauseHasFailedBinaryCheck(cs.clauseType, output.binaryChecks)
@@ -73,6 +77,9 @@ async function persist(sessionId: string, scored: EvaluateOutput): Promise<void>
       consistency_note: b.internalConsistency.note,
       improvement_notes: scored.improvementNotes,
       dimension_rationales: scored.dimensionRationales,
+      issue_coverage: scored.issueCoverage.score,
+      issue_coverage_rationale: scored.issueCoverage.rationale,
+      missed_issues: scored.issueCoverage.missedIssues,
     })
     .select('id')
   if (runError || !runRows?.[0]) {
@@ -135,9 +142,16 @@ export async function GET(request: NextRequest): Promise<Response> {
 
         const { data: session } = await supabase
           .from('sessions')
-          .select('document_type, use_case, governing_law, signatory_type, mode, party_perspective')
+          .select(
+            'document_type, use_case, governing_law, signatory_type, mode, party_perspective, document_text',
+          )
           .eq('id', sessionId)
           .single()
+
+        if (!session) {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: 'Session not found' })}\n\n`))
+          return
+        }
 
         const { data: reviews } = await supabase
           .from('clause_reviews')
@@ -152,7 +166,20 @@ export async function GET(request: NextRequest): Promise<Response> {
           return
         }
 
-        const prompt = `Document classification:\n${JSON.stringify(session, null, 2)}\n\nRedlines to evaluate:\n${JSON.stringify(reviews, null, 2)}`
+        const documentText = session?.document_text ?? ''
+        const classification = {
+          documentType: session?.document_type,
+          useCase: session?.use_case,
+          governingLaw: session?.governing_law,
+          signatoryType: session?.signatory_type,
+          mode: session?.mode,
+          partyPerspective: session?.party_perspective,
+        }
+        const prompt = [
+          `Document classification:\n${JSON.stringify(classification, null, 2)}`,
+          `Full document under review (every clause, including those the redlines did not touch):\n${documentText}`,
+          `Redlines that were made (evaluate their quality, and assess coverage against the full document above):\n${JSON.stringify(reviews, null, 2)}`,
+        ].join('\n\n')
 
         const output = await generateStructured({
           schema: EvaluateOutputSchema,

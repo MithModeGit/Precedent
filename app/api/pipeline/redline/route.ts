@@ -101,6 +101,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Pipeline pass failed', pass }, { status: 500 })
   }
 
+  // The full document text (every extracted clause), stored so Pass 3 can measure coverage
+  // of issues the redlines missed, not just the quality of the redlines made.
+  const documentText = body.clauses
+    .map((c) => `[${c.clauseType} §${c.sectionNumber}] ${c.text}`)
+    .join('\n\n')
+
   // Create the session row (id was generated in Pass 1).
   const { error: sessionError } = await supabase.from('sessions').insert({
     id: body.sessionId,
@@ -112,6 +118,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     signatory_type: body.classification.signatoryType,
     party_perspective: body.partyPerspective,
     mode: body.mode,
+    document_text: documentText,
   })
   if (sessionError) {
     return NextResponse.json({ error: 'Could not create the review session.' }, { status: 500 })

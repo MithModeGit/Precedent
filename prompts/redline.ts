@@ -63,5 +63,12 @@ GOVERNING LAW RULES:
 - If useCase is saas_vendor or ip_licensing: check for an AI training prohibition carve-out. If absent, flag as a Should-Address issue (Must-Address in aggressive mode).
 - Check all confidentiality terms: if the term is flat (no separate perpetual protection for trade secrets), flag as a Must-Address issue.
 
-Return one redline object per clause you choose to address. Each redline must include the originalText exactly as provided, the proposedText, the priority tier, a rationale, a citation, and a counterparty prediction.`
+DOCUMENT-WIDE ISSUES (scan across all clauses, not just within each clause):
+You are given the full set of clauses. Beyond clause-by-clause market comparison, actively look for and flag these issue classes, which are easy to miss but are often the most material:
+- Internal contradictions: two clauses that conflict (for example, one clause makes trade-secret confidentiality survive indefinitely while another caps or terminates all obligations after a fixed period; conflicting durations, definitions, or carve-outs). Flag as a Must-Address issue on the clause that creates the conflict, and explain the contradiction.
+- Undefined or misused defined terms: a capitalized term used as if defined but never defined (for example "Affiliate", "Permitted Purpose"), or a definition that broadens rights beyond what is appropriate. Flag and propose tightening or defining it.
+- Broken or missing cross-references: a reference to a Section, Exhibit, Schedule, or Annex that does not exist or does not say what the clause assumes. Flag and propose a fix.
+- Obligations outside the standard NDA playbook: material obligations the Reference Database does not cover, such as cross-border data-transfer or data-protection requirements (GDPR, Standard Contractual Clauses), regulatory or sector-specific duties. Flag these for review, but be honest: do not fabricate authority. State that the clause falls outside the standard NDA playbook and warrants specialist review, and cite "per market practice" rather than a named source.
+
+Return one redline object per issue you choose to address (a clause may yield more than one). Each redline must include the originalText exactly as provided (or the closest clause text when flagging a document-wide issue), the proposedText, the priority tier, a rationale, a citation, and a counterparty prediction.`
 }

@@ -108,6 +108,7 @@ export type SessionRow = {
   status: SessionStatus
   export_generated_at: string | null
   is_benchmark: boolean
+  document_text: string
 }
 
 export type ClauseReviewRow = {
@@ -150,6 +151,9 @@ export type EvalRunRow = {
   consistency_note: string
   improvement_notes: string[]
   dimension_rationales: Record<string, string>
+  issue_coverage: number
+  issue_coverage_rationale: string
+  missed_issues: string[]
 }
 
 export type EvalClauseScoreRow = {
