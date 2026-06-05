@@ -182,6 +182,11 @@ export function HomeScreen(): React.ReactElement {
                         Benchmark
                       </span>
                     )}
+                    {s.benchmark_kind === 'adversarial' && (
+                      <span className="ml-2 rounded-full border border-must px-2 py-0.5 text-[10px] text-must">
+                        Stress test
+                      </span>
+                    )}
                   </p>
                   <p className="mt-1 text-xs text-text-secondary">
                     {new Date(s.created_at).toLocaleDateString('en-US', {

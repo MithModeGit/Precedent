@@ -11,6 +11,13 @@ const JUDGE_THINKING_BUDGET = 24000
 const JUDGE_MAX_TOKENS = 64000
 
 /**
+ * Bounded thinking budget for the Gemini generator passes. Deep enough for thorough,
+ * comprehensive redline review, but capped so dynamic reasoning does not consume the output
+ * token budget and truncate the structured JSON.
+ */
+export const GEMINI_THINKING_BUDGET = 24576
+
+/**
  * Extracts the JSON object from model text by taking the span from the first opening brace
  * to the last closing brace. This is robust to markdown fences (which contain no braces) and
  * to multiple code blocks, unlike matching the first fenced block.
@@ -67,14 +74,17 @@ export async function generateStructured<T>(opts: GenerateStructuredOptions<T>):
         schema: opts.schema,
         system: opts.system,
         prompt: opts.prompt,
-        // Pass 2 echoes full clause text per redline and Pass 3 scores every clause, so
-        // the output can be large; raise the cap well above the model default to avoid
-        // truncated JSON (finishReason "length").
-        maxTokens: 60000,
-        // Disable thinking: unbounded reasoning consumes the output token budget and
-        // truncates the structured JSON (these passes are extraction/scoring, not open
-        // reasoning). gemini-3-flash-preview does not reliably honor partial budgets.
-        providerOptions: { google: { thinkingConfig: { thinkingBudget: 0 } } },
+        // Max output (64k for Gemini 3 Flash).
+        maxTokens: 65536,
+        // Substantial-but-BOUNDED thinking. Leaving thinking unbounded (the Flash default)
+        // lets dynamic reasoning consume nearly the whole output budget and truncate the JSON
+        // (finishReason "length"); disabling it (budget 0) was what made redlines shallow.
+        // A bounded budget gives deep reasoning while leaving ample room for the structured
+        // output. The SDK only exposes thinking_budget, not Gemini 3's thinking_level.
+        // Temperature is left at the Gemini 3 default of 1.0 (lowering it degrades quality).
+        providerOptions: {
+          google: { thinkingConfig: { thinkingBudget: GEMINI_THINKING_BUDGET } },
+        },
       })
       return object
     } catch (error) {

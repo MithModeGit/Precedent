@@ -109,6 +109,7 @@ export type SessionRow = {
   export_generated_at: string | null
   is_benchmark: boolean
   document_text: string
+  benchmark_kind: 'standard' | 'adversarial'
 }
 
 export type ClauseReviewRow = {

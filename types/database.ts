@@ -20,7 +20,13 @@ export interface Database {
         Row: SessionRow
         Insert: Insert<
           SessionRow,
-          'id' | 'created_at' | 'status' | 'export_generated_at' | 'is_benchmark' | 'document_text'
+          | 'id'
+          | 'created_at'
+          | 'status'
+          | 'export_generated_at'
+          | 'is_benchmark'
+          | 'document_text'
+          | 'benchmark_kind'
         >
         Update: Partial<SessionRow>
         Relationships: []

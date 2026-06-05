@@ -9,7 +9,8 @@ import { RedlineOutputSchema } from '@/schemas/redline'
 import type { Priority, ReviewMode } from '@/types'
 
 export const runtime = 'nodejs'
-export const maxDuration = 180
+// High-thinking redline generation is the heaviest pass; allow ample time (robustness over latency).
+export const maxDuration = 300
 
 /** Maximum document reviews per device (anonymous abuse guard, per DATA_MODEL.md). */
 const REVIEW_LIMIT_PER_DEVICE = 5
