@@ -4,6 +4,7 @@ import { getSupabaseServer } from '@/lib/supabase'
 import { getReferenceDatabase } from '@/lib/reference-database'
 import { buildEvaluateSystemPrompt } from '@/prompts/evaluate'
 import { getStoredEval } from '@/lib/eval-fetch'
+import { pairScoreReviewIds } from '@/lib/eval-pairing'
 import { EvaluateOutputSchema, type EvaluateOutput } from '@/schemas/evaluate'
 import {
   calculateOverallScore,
@@ -40,16 +41,15 @@ function applyServerScores(output: EvaluateOutput): EvaluateOutput {
 async function persist(sessionId: string, scored: EvaluateOutput): Promise<void> {
   const supabase = getSupabaseServer()
 
+  // Pair the model's per-clause scores to the clause reviews with a hybrid strategy
+  // (key match first, then positional fallback) so neither a format drift nor a skipped
+  // clause silently corrupts the pairings.
   const { data: reviews } = await supabase
     .from('clause_reviews')
     .select('id, clause_type, section_number')
     .eq('session_id', sessionId)
-  // Normalize the match key so trivial whitespace/case differences in the section number
-  // (model-echoed vs stored) do not silently drop a clause's per-clause scores.
-  const keyOf = (clauseType: string, sectionNumber: string | null | undefined): string =>
-    `${clauseType}|${(sectionNumber ?? '').trim().toLowerCase().replace(/\s+/g, ' ')}`
-  const idByKey = new Map<string, string>()
-  for (const r of reviews ?? []) idByKey.set(keyOf(r.clause_type, r.section_number), r.id)
+    .order('display_order', { ascending: true })
+  const reviewIdForScore = pairScoreReviewIds(scored.clauseScores, reviews ?? [])
 
   const b = scored.binaryChecks
   // One eval run per session. Insert the new run first, then prune older runs (cascade
@@ -97,8 +97,8 @@ async function persist(sessionId: string, scored: EvaluateOutput): Promise<void>
   if (pruneError) console.error(`Failed to prune old eval runs: ${pruneError.message}`)
 
   const clauseRows = scored.clauseScores
-    .map((cs) => {
-      const clauseReviewId = idByKey.get(keyOf(cs.clauseType, cs.sectionNumber))
+    .map((cs, i) => {
+      const clauseReviewId = reviewIdForScore[i]
       if (!clauseReviewId) return null
       return {
         eval_run_id: evalRunId,

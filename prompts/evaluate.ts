@@ -70,7 +70,7 @@ ISSUE COVERAGE (recall): You are given the FULL document under review, not only 
 Provide:
 - session-level dimension scores (an overall judgment across all redlines),
 - dimensionRationales: for each of the five dimensions, 2-3 sentences justifying the session-level score with the specific evidence above, including the biggest weakness for that dimension,
-- per-clause dimension scores (one entry per redline, identified by its clauseType and sectionNumber),
+- per-clause dimension scores: return EXACTLY ONE clauseScore object for EVERY redline you were given, in the SAME ORDER as the redlines, with none skipped, merged, or summarized. The clauseScores array length must equal the number of redlines. Identify each by its clauseType and sectionNumber, but order is what matters,
 - a per-clause evaluatorNote: a 2-3 sentence evidence-backed assessment of that redline (what it does well, its weakest dimension and why),
 - issueCoverage: a recall score (1-5) for how completely the redlines addressed the material issues present in the FULL document, a rationale citing what was caught and missed, and a missedIssues array naming each material issue the redlines did not address with its location. Score coverage independently of the five quality dimensions.
 - an improvementNotes array of specific, actionable observations about this session (what to fix in the redline engine, not praise).
