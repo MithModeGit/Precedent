@@ -7,13 +7,7 @@ import { SessionIndex } from '@/components/dashboard/SessionIndex'
 
 type Tab = 'trend' | 'sessions'
 
-export function EvalDashboard({
-  data,
-  now,
-}: {
-  data: DashboardData
-  now: number
-}): React.ReactElement {
+export function EvalDashboard({ data }: { data: DashboardData }): React.ReactElement {
   const [tab, setTab] = useState<Tab>('trend')
   const tabs: { value: Tab; label: string }[] = [
     { value: 'trend', label: 'Trend Overview' },
@@ -44,7 +38,6 @@ export function EvalDashboard({
           sessions={data.sessions}
           clausePerformance={data.clausePerformance}
           scoreDistribution={data.scoreDistribution}
-          now={now}
         />
       ) : (
         <SessionIndex sessions={data.sessions} />
