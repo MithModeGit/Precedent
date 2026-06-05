@@ -26,9 +26,9 @@ import {
   clauseHasFailedBinaryCheck,
 } from '../lib/eval-scoring'
 import { pairScoreReviewIds } from '../lib/eval-pairing'
+import { generateJudged } from '../lib/pipeline'
 
 const BENCHMARK_DEVICE = '00000000-0000-4000-8000-0000000000aa'
-const DAY = 24 * 60 * 60 * 1000
 const round2 = (n: number): number => Math.round(n * 100) / 100
 
 interface Benchmark {
@@ -37,9 +37,12 @@ interface Benchmark {
   documentName: string
   perspective: 'disclosing' | 'receiving'
   mode: 'conservative' | 'standard' | 'aggressive'
-  daysAgo: number
+  createdAt: string
 }
 
+// All benchmarks were produced over two days of work. Fixed dates (rather than relative
+// offsets) keep the dashboard honest about the timeline; the three standard NDAs are dated
+// June 3 and the adversarial one June 4, ordered by time so the trend reads left to right.
 const BENCHMARKS: Benchmark[] = [
   {
     id: '00000000-0000-4000-8000-000000000001',
@@ -47,7 +50,7 @@ const BENCHMARKS: Benchmark[] = [
     documentName: 'Mutual SaaS Vendor NDA.docx',
     perspective: 'receiving',
     mode: 'standard',
-    daysAgo: 21,
+    createdAt: '2026-06-03T15:00:00Z',
   },
   {
     id: '00000000-0000-4000-8000-000000000002',
@@ -55,7 +58,7 @@ const BENCHMARKS: Benchmark[] = [
     documentName: 'Employment Contractor NDA.docx',
     perspective: 'receiving',
     mode: 'standard',
-    daysAgo: 14,
+    createdAt: '2026-06-03T18:00:00Z',
   },
   {
     id: '00000000-0000-4000-8000-000000000003',
@@ -63,7 +66,7 @@ const BENCHMARKS: Benchmark[] = [
     documentName: 'M&A Due Diligence NDA.docx',
     perspective: 'receiving',
     mode: 'standard',
-    daysAgo: 7,
+    createdAt: '2026-06-03T21:00:00Z',
   },
   {
     // Deliberately hard / adversarial document to test that the evaluator discriminates.
@@ -72,7 +75,7 @@ const BENCHMARKS: Benchmark[] = [
     documentName: 'Cross-Border Data Partnership NDA.docx',
     perspective: 'receiving',
     mode: 'standard',
-    daysAgo: 2,
+    createdAt: '2026-06-04T16:00:00Z',
   },
 ]
 
@@ -112,7 +115,7 @@ async function seedOne(b: Benchmark): Promise<void> {
     join(process.cwd(), 'lib/nda-reference-database.md'),
     'utf-8',
   )
-  const createdAt = new Date(Date.now() - b.daysAgo * DAY).toISOString()
+  const createdAt = b.createdAt
 
   // Pass 1
   const { object: classification } = await generateObject({
@@ -198,12 +201,11 @@ async function seedOne(b: Benchmark): Promise<void> {
     .select('id, clause_type, section_number')
   if (clauseError) throw new Error(`Failed to insert clause reviews: ${clauseError.message}`)
 
-  // Pass 3
-  const { object: evalOut } = await generateObject({
-    model,
-    maxTokens: 60000,
-    providerOptions: { google: { thinkingConfig: { thinkingBudget: 0 } } },
+  // Pass 3: judged by Claude (a different model family than the Gemini generator) via the
+  // shared generateJudged, so benchmarks are scored exactly as live reviews are.
+  const evalOut = await generateJudged({
     schema: EvaluateOutputSchema,
+    pass: 3,
     system: buildEvaluateSystemPrompt(referenceDatabase),
     prompt: [
       `Document classification:\n${JSON.stringify(classification, null, 2)}`,
